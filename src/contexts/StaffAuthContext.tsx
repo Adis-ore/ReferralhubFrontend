@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { authApi } from '@/services/api';
 
 export interface StaffUser {
-  id: string;
+  id: number;
   name: string;
   email: string;
   avatar?: string;
@@ -9,6 +10,8 @@ export interface StaffUser {
   location: string;
   joinedDate: string;
   referralCode: string;
+  pointsBalance: number;
+  hourlyRate: number;
 }
 
 interface StaffAuthContextType {
@@ -20,22 +23,25 @@ interface StaffAuthContextType {
 
 const StaffAuthContext = createContext<StaffAuthContextType | undefined>(undefined);
 
-const demoStaffUser: StaffUser = {
-  id: 'staff-1',
-  name: 'Jessica Martinez',
-  email: 'jessica.m@company.com',
-  classification: 'Registered Nurse',
-  location: 'Sydney',
-  joinedDate: '2024-01-15',
-  referralCode: 'JESS2024',
-};
-
 export function StaffAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<StaffUser | null>(null);
 
   const login = async (email: string, password: string) => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setUser(demoStaffUser);
+    const result = await authApi.staffLogin(email, password);
+    const u = result.user;
+    setUser({
+      id: u.id,
+      name: `${u.firstName} ${u.lastName}`,
+      email: u.email,
+      avatar: u.avatar,
+      classification: u.classification,
+      location: u.location,
+      joinedDate: u.joinDate,
+      referralCode: u.referralCode,
+      pointsBalance: u.pointsBalance,
+      hourlyRate: u.hourlyRate,
+    });
+    localStorage.setItem('staff_token', result.token);
   };
 
   const logout = () => {

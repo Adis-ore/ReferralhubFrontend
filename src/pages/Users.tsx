@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usersApi } from '@/services/api';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -23,19 +25,10 @@ interface User {
   joinedDate: string;
 }
 
-const mockUsers: User[] = [
-  { id: '1', name: 'Sarah Johnson', email: 'sarah.j@email.com', classification: 'Registered Nurse', location: 'Sydney', referralsMade: 8, referralsReceived: 1, totalPoints: 4000, status: 'active', joinedDate: '2024-01-15' },
-  { id: '2', name: 'Michael Chen', email: 'michael.c@email.com', classification: 'Enrolled Nurse', location: 'Melbourne', referralsMade: 5, referralsReceived: 1, totalPoints: 2500, status: 'active', joinedDate: '2024-02-20' },
-  { id: '3', name: 'Emma Williams', email: 'emma.w@email.com', classification: 'Support Worker', location: 'Brisbane', referralsMade: 12, referralsReceived: 0, totalPoints: 6000, status: 'active', joinedDate: '2023-11-10' },
-  { id: '4', name: 'James Park', email: 'james.p@email.com', classification: 'Assistant in Nursing', location: 'Perth', referralsMade: 3, referralsReceived: 1, totalPoints: 1500, status: 'inactive', joinedDate: '2024-03-05' },
-  { id: '5', name: 'Alex Thompson', email: 'alex.t@email.com', classification: 'Registered Nurse', location: 'Sydney', referralsMade: 0, referralsReceived: 1, totalPoints: 500, status: 'pending', joinedDate: '2024-06-01' },
-  { id: '6', name: 'Lisa Garcia', email: 'lisa.g@email.com', classification: 'Enrolled Nurse', location: 'Melbourne', referralsMade: 7, referralsReceived: 0, totalPoints: 3500, status: 'active', joinedDate: '2023-12-15' },
-  { id: '7', name: 'David Kim', email: 'david.k@email.com', classification: 'Support Worker', location: 'Brisbane', referralsMade: 4, referralsReceived: 1, totalPoints: 2000, status: 'active', joinedDate: '2024-01-28' },
-  { id: '8', name: 'Rachel Brown', email: 'rachel.b@email.com', classification: 'Registered Nurse', location: 'Sydney', referralsMade: 15, referralsReceived: 0, totalPoints: 7500, status: 'active', joinedDate: '2023-09-20' },
-];
-
 export default function Users() {
   const navigate = useNavigate();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
@@ -43,7 +36,31 @@ export default function Users() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const filteredUsers = mockUsers.filter(user => {
+  useEffect(() => {
+    setLoading(true);
+    usersApi.list()
+      .then((res) => {
+        const mapped: User[] = res.data.map((u: any) => ({
+          id: String(u.id),
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          classification: u.classification,
+          location: u.location,
+          referralsMade: u.totalReferrals ?? 0,
+          referralsReceived: 0,
+          totalPoints: u.pointsBalance ?? 0,
+          status: u.isActive ? 'active' : 'inactive',
+          joinedDate: u.joinDate ? u.joinDate.split('T')[0] : '',
+        }));
+        setUsers(mapped);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load users');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) ||
       user.email.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
@@ -208,19 +225,23 @@ export default function Users() {
         </FilterBar>
 
         {/* Table */}
-        <DataTable
-          columns={columns}
-          data={filteredUsers}
-          keyExtractor={(user) => user.id}
-          onRowClick={(user) => navigate(`/users/${user.id}`)}
-          pagination={{
-            page,
-            pageSize,
-            total: filteredUsers.length,
-            onPageChange: setPage,
-            onPageSizeChange: setPageSize,
-          }}
-        />
+        {loading ? (
+          <div className="py-12 text-center text-muted-foreground">Loading users...</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredUsers}
+            keyExtractor={(user) => user.id}
+            onRowClick={(user) => navigate(`/users/${user.id}`)}
+            pagination={{
+              page,
+              pageSize,
+              total: filteredUsers.length,
+              onPageChange: setPage,
+              onPageSizeChange: setPageSize,
+            }}
+          />
+        )}
       </div>
     </div>
   );

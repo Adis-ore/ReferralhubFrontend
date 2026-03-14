@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { connecteamApi } from '@/services/api';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -40,18 +42,6 @@ interface Shift {
   notes?: string;
 }
 
-const mockShifts: Shift[] = [
-  { id: 'SH-001', userId: '1', userName: 'Adewale Johnson', userEmail: 'adewale.johnson@company.com', department: 'Sales', date: '2024-06-15', startTime: '08:00', endTime: '16:00', hoursWorked: 8, type: 'regular', status: 'approved', approvedBy: 'Operations Admin' },
-  { id: 'SH-002', userId: '2', userName: 'Chioma Okafor', userEmail: 'chioma.okafor@company.com', department: 'Sales', date: '2024-06-15', startTime: '09:00', endTime: '17:00', hoursWorked: 8, type: 'regular', status: 'pending' },
-  { id: 'SH-003', userId: '3', userName: 'Oluwaseun Adebayo', userEmail: 'oluwaseun.adebayo@company.com', department: 'Sales', date: '2024-06-15', startTime: '08:00', endTime: '20:00', hoursWorked: 12, type: 'overtime', status: 'pending', notes: 'Urgent project deadline' },
-  { id: 'SH-004', userId: '4', userName: 'Blessing Eze', userEmail: 'blessing.eze@company.com', department: 'Sales', date: '2024-06-14', startTime: '08:00', endTime: '16:00', hoursWorked: 8, type: 'regular', status: 'approved', approvedBy: 'Operations Admin' },
-  { id: 'SH-005', userId: '5', userName: 'Emeka Nwosu', userEmail: 'emeka.nwosu@company.com', department: 'Sales', date: '2024-06-14', startTime: '10:00', endTime: '18:00', hoursWorked: 8, type: 'regular', status: 'rejected', approvedBy: 'Operations Admin', notes: 'Duplicate entry' },
-  { id: 'SH-006', userId: '21', userName: 'Ahmed Musa', userEmail: 'ahmed.musa@company.com', department: 'Marketing', date: '2024-06-16', startTime: '08:00', endTime: '16:00', hoursWorked: 8, type: 'weekend', status: 'pending' },
-  { id: 'SH-007', userId: '33', userName: 'Victor Eze', userEmail: 'victor.eze@company.com', department: 'IT', date: '2024-06-15', startTime: '22:00', endTime: '06:00', hoursWorked: 8, type: 'regular', status: 'auto_approved' },
-  { id: 'SH-008', userId: '6', userName: 'Fatima Abdullahi', userEmail: 'fatima.abdullahi@company.com', department: 'Sales', date: '2024-06-13', startTime: '08:00', endTime: '16:00', hoursWorked: 8, type: 'regular', status: 'approved', approvedBy: 'Manager' },
-  { id: 'SH-009', userId: '22', userName: 'Grace Adekunle', userEmail: 'grace.adekunle@company.com', department: 'Marketing', date: '2024-06-13', startTime: '08:00', endTime: '20:00', hoursWorked: 12, type: 'overtime', status: 'approved', approvedBy: 'Operations Admin' },
-  { id: 'SH-010', userId: '7', userName: 'Ibrahim Yusuf', userEmail: 'ibrahim.yusuf@company.com', department: 'Sales', date: '2024-06-12', startTime: '08:00', endTime: '16:00', hoursWorked: 8, type: 'public_holiday', status: 'approved', approvedBy: 'Operations Admin' },
-];
 
 const shiftTypeLabels: Record<string, string> = {
   regular: 'Regular',
@@ -77,7 +67,28 @@ export default function ShiftsHours() {
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [modalType, setModalType] = useState<'approve' | 'reject' | null>(null);
-  const [shifts, setShifts] = useState(mockShifts);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    connecteamApi.getHours({ limit: 100 }).then(({ data }) => {
+      setShifts(data.map((h: any) => ({
+        id: h.id,
+        userId: String(h.userId),
+        userName: h.userName,
+        userEmail: `${h.userName?.toLowerCase().replace(' ', '.')}@company.com`,
+        department: h.classification || '',
+        date: h.shiftDate,
+        startTime: h.clockIn,
+        endTime: h.clockOut,
+        hoursWorked: h.hoursWorked,
+        type: h.shiftType as Shift['type'],
+        status: h.status as Shift['status'],
+        approvedBy: h.approvedBy || undefined,
+        notes: h.rejectionReason || undefined,
+      })));
+    }).catch(() => toast.error('Failed to load shifts')).finally(() => setLoading(false));
+  }, []);
 
   const pendingCount = shifts.filter(s => s.status === 'pending').length;
   const approvedCount = shifts.filter(s => s.status === 'approved' || s.status === 'auto_approved').length;
@@ -98,20 +109,28 @@ export default function ShiftsHours() {
     });
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!selectedShift) return;
-    setShifts(prev => prev.map(s =>
-      s.id === selectedShift.id ? { ...s, status: 'approved' as const, approvedBy: 'Current Admin' } : s
-    ));
+    try {
+      await connecteamApi.approveHours(selectedShift.id, { status: 'approved', approvedBy: 'admin' });
+      setShifts(prev => prev.map(s =>
+        s.id === selectedShift.id ? { ...s, status: 'approved' as const, approvedBy: 'Current Admin' } : s
+      ));
+      toast.success('Shift approved');
+    } catch { toast.error('Failed to approve shift'); }
     setModalType(null);
     setSelectedShift(null);
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedShift) return;
-    setShifts(prev => prev.map(s =>
-      s.id === selectedShift.id ? { ...s, status: 'rejected' as const, approvedBy: 'Current Admin' } : s
-    ));
+    try {
+      await connecteamApi.approveHours(selectedShift.id, { status: 'rejected', approvedBy: 'admin' });
+      setShifts(prev => prev.map(s =>
+        s.id === selectedShift.id ? { ...s, status: 'rejected' as const } : s
+      ));
+      toast.success('Shift rejected');
+    } catch { toast.error('Failed to reject shift'); }
     setModalType(null);
     setSelectedShift(null);
   };

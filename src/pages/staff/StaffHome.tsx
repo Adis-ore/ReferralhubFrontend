@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { usersApi, referralsApi } from '@/services/api';
 import { ProgressRing } from '@/components/staff/ProgressRing';
 import { ReferralStatusBadge } from '@/components/staff/ReferralStatusBadge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const recentReferrals = [
+const defaultRecentReferrals = [
   { id: '1', name: 'Emma Wilson', status: 'completed' as const, date: '2024-05-20' },
   { id: '2', name: 'James Chen', status: 'eligible' as const, date: '2024-06-01' },
   { id: '3', name: 'Sarah Brown', status: 'working' as const, date: '2024-06-10' },
@@ -19,11 +20,23 @@ const recentReferrals = [
 export default function StaffHome() {
   const { user } = useStaffAuth();
   const [copied, setCopied] = useState(false);
+  const [recentReferralsList, setRecentReferralsList] = useState(defaultRecentReferrals);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [availablePoints, setAvailablePoints] = useState(0);
 
-  const totalPoints = 3500;
-  const pendingPoints = 500;
-  const availablePoints = 2500;
-  const withdrawnPoints = 500;
+  useEffect(() => {
+    if (!user?.id) return;
+    usersApi.get(user.id).then((u: any) => {
+      setTotalPoints(u.pointsBalance || 0);
+      setAvailablePoints(u.pointsBalance || 0);
+    }).catch(() => {});
+    referralsApi.list({ userId: user.id, limit: 3 }).then(({ data }: any) => {
+      if (data?.length) setRecentReferralsList(data.map((r: any) => ({ id: String(r.id), name: r.refereeName, status: r.status, date: r.createdAt?.split('T')[0] })));
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const pendingPoints = 0;
+  const withdrawnPoints = 0;
 
   const copyReferralCode = () => {
     navigator.clipboard.writeText(user?.referralCode || '');
@@ -155,7 +168,7 @@ export default function StaffHome() {
         </div>
 
         <div className="space-y-3">
-          {recentReferrals.map((referral) => (
+          {recentReferralsList.map((referral) => (
             <div key={referral.id} className="bg-card rounded-xl p-4 border border-border flex items-center gap-4">
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="bg-staff-primary/10 text-staff-primary">

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { connecteamApi } from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FaClock, FaCalendar, FaChartLine } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
@@ -28,10 +30,25 @@ const monthlyTotals = [
 ];
 
 export default function StaffHours() {
+  const { user } = useStaffAuth();
   const [viewType, setViewType] = useState('weekly');
+  const [hoursData, setHoursData] = useState(mockHours);
 
-  const totalHoursThisMonth = 156;
-  const averageWeekly = 39;
+  useEffect(() => {
+    if (!user?.id) return;
+    connecteamApi.getHours({ userId: user.id, limit: 50 }).then(({ data }: any) => {
+      if (data?.length) setHoursData(data.map((h: any) => ({
+        period: `Shift ${h.id}`,
+        startDate: h.shiftDate,
+        endDate: h.shiftDate,
+        hours: h.hoursWorked,
+        status: h.status === 'approved' ? 'synced' : 'pending',
+      })));
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const totalHoursThisMonth = hoursData.filter(h => h.status === 'synced').reduce((s, h) => s + h.hours, 0);
+  const averageWeekly = hoursData.length ? Math.round(totalHoursThisMonth / Math.max(hoursData.length, 1)) : 0;
 
   return (
     <div className="px-4 py-6">

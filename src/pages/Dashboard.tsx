@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaUsers, FaGift, FaCreditCard, FaClock, FaCheckCircle, FaCalendar, FaHourglassHalf } from 'react-icons/fa';
 import { GiTwoCoins } from 'react-icons/gi';
 import { AdminHeader } from '@/components/layout/AdminHeader';
@@ -9,11 +9,17 @@ import { PointsChart } from '@/components/dashboard/PointsChart';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { dashboardApi } from '@/services/api';
 
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState('30d');
   const [location, setLocation] = useState('all');
   const [classification, setClassification] = useState('all');
+  const [stats, setStats] = useState({ totalUsers: 0, totalReferrals: 0, totalPoints: 0, pendingWithdrawals: 0, hoursImportedToday: 0, pendingHours: 0 });
+
+  useEffect(() => {
+    dashboardApi.getStats().then(setStats).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -74,49 +80,37 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
           <KPICard
             title="Total Users"
-            value="2,847"
-            change={{ value: 12.5, period: 'last month' }}
+            value={stats.totalUsers.toLocaleString()}
             icon={<FaUsers className="w-5 h-5" />}
             variant="accent"
           />
           <KPICard
             title="Total Referrals"
-            value="1,284"
-            change={{ value: 8.2, period: 'last month' }}
+            value={stats.totalReferrals.toLocaleString()}
             icon={<FaGift className="w-5 h-5" />}
             variant="success"
           />
           <KPICard
             title="Points Issued"
-            value="64,200"
-            change={{ value: 15.3, period: 'last month' }}
+            value={stats.totalPoints.toLocaleString()}
             icon={<GiTwoCoins className="w-5 h-5" />}
             variant="default"
           />
           <KPICard
             title="Pending Withdrawals"
-            value="$12,450"
-            change={{ value: -5.1, period: 'last month' }}
+            value={stats.pendingWithdrawals.toLocaleString()}
             icon={<FaClock className="w-5 h-5" />}
             variant="warning"
           />
           <KPICard
-            title="Approved Payouts"
-            value="$89,320"
-            change={{ value: 22.4, period: 'last month' }}
+            title="Pending Hours"
+            value={stats.pendingHours.toLocaleString()}
             icon={<FaCheckCircle className="w-5 h-5" />}
             variant="success"
           />
           <KPICard
-            title="Active Campaigns"
-            value="3"
-            icon={<FaCreditCard className="w-5 h-5" />}
-            variant="accent"
-          />
-          <KPICard
             title="Hours Imported Today"
-            value="20"
-            change={{ value: 4.2, period: 'yesterday' }}
+            value={stats.hoursImportedToday.toLocaleString()}
             icon={<FaHourglassHalf className="w-5 h-5" />}
             variant="default"
           />

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { notificationsApi } from '@/services/api';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,7 +81,7 @@ const priorityColors: Record<string, string> = {
   urgent: 'text-destructive',
 };
 
-const mockNotifications: AdminNotification[] = [
+const mockNotifications_UNUSED: AdminNotification[] = [
   {
     id: 'N-001',
     title: 'New withdrawal request pending',
@@ -213,8 +215,16 @@ const mockBroadcasts: BroadcastMessage[] = [
 ];
 
 export default function AdminNotifications() {
-  const [notifications, setNotifications] = useState(mockNotifications);
-  const [broadcasts, setBroadcasts] = useState(mockBroadcasts);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [broadcasts, setBroadcasts] = useState<BroadcastMessage[]>(mockBroadcasts);
+
+  useEffect(() => {
+    notificationsApi.getAdmin().then((data: any[]) => setNotifications(data.map(n => ({
+      id: String(n.id), title: n.title, message: n.message,
+      type: n.type as NotificationType, priority: n.priority || 'normal',
+      isRead: n.isRead, createdAt: n.createdAt,
+    })))).catch(() => toast.error('Failed to load notifications'));
+  }, []);
   const [activeTab, setActiveTab] = useState('inbox');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showBroadcastSheet, setShowBroadcastSheet] = useState(false);
@@ -234,15 +244,18 @@ export default function AdminNotifications() {
     return n.type === typeFilter;
   });
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
+    try { await notificationsApi.markAdminRead(parseInt(id)); } catch {}
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
   const markAllAsRead = () => {
+    notifications.filter(n => !n.isRead).forEach(n => notificationsApi.markAdminRead(parseInt(n.id)).catch(() => {}));
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
-  const deleteNotification = (id: string) => {
+  const deleteNotification = async (id: string) => {
+    try { await notificationsApi.deleteAdmin(parseInt(id)); } catch {}
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 

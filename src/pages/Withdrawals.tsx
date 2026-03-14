@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -36,6 +36,8 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { withdrawalsApi } from '@/services/api';
+import { toast } from 'sonner';
 
 interface Withdrawal {
   id: string;
@@ -64,116 +66,10 @@ const currentActiveRate = {
   currencyCode: 'AUD'
 };
 
-const mockWithdrawals: Withdrawal[] = [
-  { 
-    id: 'WR-2001',
-    userId: '1',
-    userName: 'Sarah Johnson',
-    userEmail: 'sarah.j@email.com',
-    pointsWithdrawn: 500,
-    conversionRate: 2,
-    currencySymbol: '$',
-    currencyCode: 'AUD',
-    finalAmount: 250,
-    status: 'pending',
-    requestedDate: '2024-06-15',
-    bankName: 'GTBank',
-    accountNumber: '1234567890',
-    accountName: 'Sarah Johnson',
-  },
-  {
-    id: 'WR-2002',
-    userId: '2',
-    userName: 'Michael Chen',
-    userEmail: 'michael.c@email.com',
-    pointsWithdrawn: 1000,
-    conversionRate: 2,
-    currencySymbol: '$',
-    currencyCode: 'AUD',
-    finalAmount: 500,
-    status: 'pending',
-    requestedDate: '2024-06-14',
-    bankName: 'ANZ',
-    accountNumber: '9876543210',
-    accountName: 'Michael Chen',
-  },
-  {
-    id: 'WR-2003',
-    userId: '3',
-    userName: 'Emma Williams',
-    userEmail: 'emma.w@email.com',
-    pointsWithdrawn: 750,
-    conversionRate: 2,
-    currencySymbol: '$',
-    currencyCode: 'AUD',
-    finalAmount: 375,
-    status: 'approved',
-    requestedDate: '2024-06-12',
-    processedDate: '2024-06-13',
-    processedBy: 'Finance Admin',
-    bankName: 'Westpac',
-    accountNumber: '5551234567',
-    accountName: 'Emma Williams',
-  },
-  {
-    id: 'WR-2004',
-    userId: '4',
-    userName: 'James Park',
-    userEmail: 'james.p@email.com',
-    pointsWithdrawn: 250,
-    conversionRate: 2,
-    currencySymbol: '$',
-    currencyCode: 'AUD',
-    finalAmount: 125,
-    status: 'processing',
-    requestedDate: '2024-06-10',
-    processedDate: '2024-06-11',
-    processedBy: 'Finance Admin',
-    bankName: 'Commonwealth Bank',
-    accountNumber: '1112223334',
-    accountName: 'James Park',
-  },
-  {
-    id: 'WR-2005',
-    userId: '5',
-    userName: 'Lisa Garcia',
-    userEmail: 'lisa.g@email.com',
-    pointsWithdrawn: 1500,
-    conversionRate: 2,
-    currencySymbol: '$',
-    currencyCode: 'AUD',
-    finalAmount: 750,
-    status: 'paid',
-    requestedDate: '2024-06-05',
-    processedDate: '2024-06-08',
-    processedBy: 'Finance Admin',
-    bankName: 'NAB',
-    accountNumber: '4445556667',
-    accountName: 'Lisa Garcia',
-  },
-  {
-    id: 'WR-2006',
-    userId: '6',
-    userName: 'David Kim',
-    userEmail: 'david.k@email.com',
-    pointsWithdrawn: 250,
-    conversionRate: 2.5, // Historical rate - different from current
-    currencySymbol: '$',
-    currencyCode: 'AUD',
-    finalAmount: 100,
-    status: 'rejected',
-    requestedDate: '2024-06-01',
-    processedDate: '2024-06-02',
-    processedBy: 'Finance Admin',
-    note: 'Insufficient hours worked',
-    bankName: 'GTBank',
-    accountNumber: '7778889990',
-    accountName: 'David Kim',
-  },
-];
-
 export default function Withdrawals() {
   const { user } = useAuth();
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('pending');
@@ -183,6 +79,37 @@ export default function Withdrawals() {
   const [modalType, setModalType] = useState<'approve' | 'reject' | 'pay' | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLoading(true);
+    withdrawalsApi.list()
+      .then((res) => {
+        const mapped: Withdrawal[] = res.data.map((w: any) => ({
+          id: String(w.id),
+          userId: String(w.userId),
+          userName: w.userName ?? '',
+          userEmail: w.userEmail ?? '',
+          pointsWithdrawn: w.pointsWithdrawn ?? 0,
+          conversionRate: w.conversionRate ?? 2,
+          currencySymbol: w.currencySymbol ?? '$',
+          currencyCode: w.currencyCode ?? 'AUD',
+          finalAmount: w.finalAmount ?? 0,
+          status: w.status,
+          requestedDate: w.requestedDate ? w.requestedDate.split('T')[0] : '',
+          processedDate: w.processedDate ? w.processedDate.split('T')[0] : undefined,
+          processedBy: w.processedBy,
+          note: w.note,
+          bankName: w.bankName,
+          accountNumber: w.accountNumber,
+          accountName: w.accountName,
+        }));
+        setWithdrawals(mapped);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load withdrawals');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
@@ -203,7 +130,7 @@ export default function Withdrawals() {
   };
 
   const exportSelected = (format: 'csv' | 'pdf' | 'aba') => {
-    const items = mockWithdrawals.filter(w => selectedIds.has(w.id));
+    const items = withdrawals.filter(w => selectedIds.has(w.id));
     if (items.length === 0) {
       alert('Select at least one withdrawal to export.');
       return;
@@ -251,7 +178,7 @@ export default function Withdrawals() {
   const canManage = user?.role === 'super_admin' || user?.role === 'finance_admin';
 
   const getFilteredWithdrawals = () => {
-    return mockWithdrawals.filter(w => {
+    return withdrawals.filter(w => {
       const matchesSearch = w.userName.toLowerCase().includes(search.toLowerCase()) ||
         w.id.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'all' || w.status === statusFilter;
@@ -263,14 +190,14 @@ export default function Withdrawals() {
     });
   };
 
-  const pendingCount = mockWithdrawals.filter(w => w.status === 'pending').length;
-  const processingCount = mockWithdrawals.filter(w => w.status === 'approved' || w.status === 'processing').length;
-  const completedCount = mockWithdrawals.filter(w => w.status === 'paid' || w.status === 'rejected').length;
+  const pendingCount = withdrawals.filter(w => w.status === 'pending').length;
+  const processingCount = withdrawals.filter(w => w.status === 'approved' || w.status === 'processing').length;
+  const completedCount = withdrawals.filter(w => w.status === 'paid' || w.status === 'rejected').length;
   
   // Calculate totals
-  const pendingAmount = mockWithdrawals.filter(w => w.status === 'pending').reduce((a, b) => a + b.finalAmount, 0);
-  const processingAmount = mockWithdrawals.filter(w => w.status === 'approved' || w.status === 'processing').reduce((a, b) => a + b.finalAmount, 0);
-  const paidAmount = mockWithdrawals.filter(w => w.status === 'paid').reduce((a, b) => a + b.finalAmount, 0);
+  const pendingAmount = withdrawals.filter(w => w.status === 'pending').reduce((a, b) => a + b.finalAmount, 0);
+  const processingAmount = withdrawals.filter(w => w.status === 'approved' || w.status === 'processing').reduce((a, b) => a + b.finalAmount, 0);
+  const paidAmount = withdrawals.filter(w => w.status === 'paid').reduce((a, b) => a + b.finalAmount, 0);
 
   // Check if rate differs from current
   const getRateDifference = (w: Withdrawal) => {
@@ -574,6 +501,9 @@ export default function Withdrawals() {
             </FilterBar>
 
             {/* Table */}
+            {loading ? (
+              <div className="py-12 text-center text-muted-foreground">Loading withdrawals...</div>
+            ) : (
             <DataTable
               columns={columns}
               data={filteredData}
@@ -586,6 +516,7 @@ export default function Withdrawals() {
                 onPageSizeChange: setPageSize,
               }}
             />
+            )}
           </TabsContent>
         </Tabs>
       </div>

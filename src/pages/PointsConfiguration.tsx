@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,8 @@ import {
 import { FaHistory } from 'react-icons/fa';
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
-import { professionRates as initialProfessionRates } from '@/data/mockData';
+import { pointsApi } from '@/services/api';
+import { toast } from 'sonner';
 
 interface ProfessionRate {
   id: number;
@@ -98,13 +99,21 @@ export default function PointsConfiguration() {
   const [activeTab, setActiveTab] = useState('current');
   const [showNewRate, setShowNewRate] = useState(false);
   const [showDeactivate, setShowDeactivate] = useState(false);
-  
+
   // Profession rates state
-  const [professionRates, setProfessionRates] = useState<ProfessionRate[]>(
-    initialProfessionRates as ProfessionRate[]
-  );
+  const [professionRates, setProfessionRates] = useState<ProfessionRate[]>([]);
   const [editingRateId, setEditingRateId] = useState<number | null>(null);
   const [editCashPerPoint, setEditCashPerPoint] = useState('');
+
+  useEffect(() => {
+    pointsApi.getProfessionRates()
+      .then((data) => {
+        setProfessionRates(data as ProfessionRate[]);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load profession rates');
+      });
+  }, []);
 
   // New rate form
   const [newCurrency, setNewCurrency] = useState('AUD');
@@ -532,9 +541,16 @@ export default function PointsConfiguration() {
                               onClick={() => {
                                 const val = parseFloat(editCashPerPoint);
                                 if (val > 0) {
-                                  setProfessionRates(prev =>
-                                    prev.map(r => r.id === rate.id ? { ...r, cashPerPoint: val } : r)
-                                  );
+                                  pointsApi.updateProfessionRate(rate.id, { cashPerPoint: val })
+                                    .then(() => {
+                                      setProfessionRates(prev =>
+                                        prev.map(r => r.id === rate.id ? { ...r, cashPerPoint: val } : r)
+                                      );
+                                      toast.success('Rate updated');
+                                    })
+                                    .catch((err) => {
+                                      toast.error(err.message || 'Failed to update rate');
+                                    });
                                 }
                                 setEditingRateId(null);
                               }}

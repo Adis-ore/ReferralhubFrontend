@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { FaEye, FaCalendar, FaUser, FaFileAlt, FaShieldAlt, FaCreditCard, FaGift, FaDownload } from 'react-icons/fa';
+import { auditLogsApi } from '@/services/api';
+import { toast } from 'sonner';
 import { FiSettings } from 'react-icons/fi';
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
@@ -24,105 +26,6 @@ interface AuditLog {
   changes?: { field: string; before: string; after: string }[];
 }
 
-const mockLogs: AuditLog[] = [
-  { 
-    id: '1', 
-    action: 'Approved withdrawal request', 
-    actionType: 'approve', 
-    resource: 'Withdrawal', 
-    resourceId: 'WR-2003', 
-    admin: 'Michael Torres', 
-    adminRole: 'Finance Admin', 
-    timestamp: '2024-06-15 14:32:15', 
-    ipAddress: '192.168.1.45',
-    changes: [{ field: 'status', before: 'pending', after: 'approved' }]
-  },
-  { 
-    id: '2', 
-    action: 'Updated referral campaign rules', 
-    actionType: 'update', 
-    resource: 'Campaign', 
-    resourceId: 'CAMP-001', 
-    admin: 'Sarah Chen', 
-    adminRole: 'Super Admin', 
-    timestamp: '2024-06-15 13:15:42', 
-    ipAddress: '192.168.1.10',
-    changes: [
-      { field: 'min_hours', before: '100', after: '120' },
-      { field: 'point_value', before: '500', after: '600' }
-    ]
-  },
-  { 
-    id: '3', 
-    action: 'Manual points adjustment', 
-    actionType: 'update', 
-    resource: 'Points', 
-    resourceId: 'USR-1234', 
-    admin: 'Emma Williams', 
-    adminRole: 'Operations Admin', 
-    timestamp: '2024-06-15 11:28:33', 
-    ipAddress: '192.168.1.22',
-    changes: [{ field: 'points', before: '2500', after: '2700' }]
-  },
-  { 
-    id: '4', 
-    action: 'Rejected withdrawal request', 
-    actionType: 'reject', 
-    resource: 'Withdrawal', 
-    resourceId: 'WR-2006', 
-    admin: 'Michael Torres', 
-    adminRole: 'Finance Admin', 
-    timestamp: '2024-06-15 10:45:12', 
-    ipAddress: '192.168.1.45',
-    changes: [{ field: 'status', before: 'pending', after: 'rejected' }]
-  },
-  { 
-    id: '5', 
-    action: 'System configuration change', 
-    actionType: 'config', 
-    resource: 'Settings', 
-    resourceId: 'SYS', 
-    admin: 'Sarah Chen', 
-    adminRole: 'Super Admin', 
-    timestamp: '2024-06-14 16:20:00', 
-    ipAddress: '192.168.1.10',
-    changes: [{ field: 'timezone', before: 'UTC+10', after: 'UTC+11' }]
-  },
-  { 
-    id: '6', 
-    action: 'Override applied', 
-    actionType: 'override', 
-    resource: 'User', 
-    resourceId: 'USR-5678', 
-    admin: 'Sarah Chen', 
-    adminRole: 'Super Admin', 
-    timestamp: '2024-06-14 15:00:00', 
-    ipAddress: '192.168.1.10',
-    changes: [{ field: 'status', before: 'suspended', after: 'active' }]
-  },
-  { 
-    id: '7', 
-    action: 'Admin login', 
-    actionType: 'login', 
-    resource: 'Auth', 
-    resourceId: 'SESSION-789', 
-    admin: 'James Park', 
-    adminRole: 'Manager', 
-    timestamp: '2024-06-14 09:15:00', 
-    ipAddress: '192.168.1.88'
-  },
-  { 
-    id: '8', 
-    action: 'Created new referral campaign', 
-    actionType: 'create', 
-    resource: 'Campaign', 
-    resourceId: 'CAMP-002', 
-    admin: 'Sarah Chen', 
-    adminRole: 'Super Admin', 
-    timestamp: '2024-06-13 14:30:00', 
-    ipAddress: '192.168.1.10'
-  },
-];
 
 const actionTypeConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string }> = {
   create: { icon: FaGift, color: 'bg-success/10 text-success' },
@@ -136,6 +39,8 @@ const actionTypeConfig: Record<string, { icon: React.ComponentType<{ className?:
 };
 
 export default function AuditLogs() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [adminFilter, setAdminFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
@@ -144,7 +49,31 @@ export default function AuditLogs() {
   const [pageSize, setPageSize] = useState(10);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  const filteredLogs = mockLogs.filter(log => {
+  useEffect(() => {
+    setLoading(true);
+    auditLogsApi.list()
+      .then((res) => {
+        const mapped: AuditLog[] = res.data.map((l: any) => ({
+          id: String(l.id),
+          action: l.action ?? '',
+          actionType: l.actionType ?? 'update',
+          resource: l.resource ?? '',
+          resourceId: String(l.resourceId ?? ''),
+          admin: l.admin ?? '',
+          adminRole: l.adminRole ?? '',
+          timestamp: l.timestamp ?? '',
+          ipAddress: l.ipAddress ?? '',
+          changes: l.changes,
+        }));
+        setLogs(mapped);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load audit logs');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredLogs = logs.filter(log => {
     const matchesSearch = log.action.toLowerCase().includes(search.toLowerCase()) ||
       log.resourceId.toLowerCase().includes(search.toLowerCase()) ||
       log.admin.toLowerCase().includes(search.toLowerCase());
@@ -153,7 +82,7 @@ export default function AuditLogs() {
     return matchesSearch && matchesAdmin && matchesAction;
   });
 
-  const uniqueAdmins = [...new Set(mockLogs.map(l => l.admin))];
+  const uniqueAdmins = [...new Set(logs.map(l => l.admin))];
 
   const columns = [
     {
@@ -306,19 +235,23 @@ export default function AuditLogs() {
         </FilterBar>
 
         {/* Table */}
-        <DataTable
-          columns={columns}
-          data={filteredLogs}
-          keyExtractor={(log) => log.id}
-          onRowClick={(log) => setSelectedLog(log)}
-          pagination={{
-            page,
-            pageSize,
-            total: filteredLogs.length,
-            onPageChange: setPage,
-            onPageSizeChange: setPageSize,
-          }}
-        />
+        {loading ? (
+          <div className="py-12 text-center text-muted-foreground">Loading audit logs...</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredLogs}
+            keyExtractor={(log) => log.id}
+            onRowClick={(log) => setSelectedLog(log)}
+            pagination={{
+              page,
+              pageSize,
+              total: filteredLogs.length,
+              onPageChange: setPage,
+              onPageSizeChange: setPageSize,
+            }}
+          />
+        )}
       </div>
 
       {/* Log Detail Sheet */}

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { referralsApi } from '@/services/api';
 import { ReferralStatusBadge } from '@/components/staff/ReferralStatusBadge';
 import { ReferralProgress } from '@/components/staff/ReferralProgress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -41,12 +43,27 @@ const statusToStep: Record<ReferralStatus, number> = {
 };
 
 export default function StaffReferrals() {
+  const { user } = useStaffAuth();
   const [activeTab, setActiveTab] = useState('all');
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
+  const [allReferrals, setAllReferrals] = useState<Referral[]>(mockReferrals);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    referralsApi.list({ userId: user.id, limit: 100 }).then(({ data }: any) => {
+      if (data?.length) setAllReferrals(data.map((r: any) => ({
+        id: String(r.id), name: r.refereeName, email: r.refereeEmail || '',
+        status: (r.status === 'completed' ? 'completed' : r.status === 'approved' ? 'eligible' : r.status === 'pending' ? 'working' : 'invited') as ReferralStatus,
+        invitedDate: r.createdAt?.split('T')[0] || '',
+        hoursCompleted: 0, hoursRequired: 120,
+        pointsEarned: r.pointsAwarded || 0,
+      })));
+    }).catch(() => {});
+  }, [user?.id]);
 
   const getFilteredReferrals = () => {
-    if (activeTab === 'all') return mockReferrals;
-    return mockReferrals.filter(r => r.status === activeTab);
+    if (activeTab === 'all') return allReferrals;
+    return allReferrals.filter(r => r.status === activeTab);
   };
 
   const statusCounts = {

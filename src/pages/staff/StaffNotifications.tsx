@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { notificationsApi } from '@/services/api';
 import { FaBell, FaGift, FaCreditCard, FaCheck, FaClock, FaInfoCircle, FaTrashAlt } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -29,18 +31,31 @@ const typeConfig: Record<string, { icon: React.ComponentType<{ className?: strin
 };
 
 export default function StaffNotifications() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const { user } = useStaffAuth();
+  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    notificationsApi.getStaff(user.id).then((data: any[]) => {
+      if (data?.length) setNotifications(data.map(n => ({
+        id: String(n.id), type: n.type as Notification['type'],
+        title: n.title, message: n.message,
+        time: new Date(n.createdAt).toLocaleDateString(),
+        read: n.isRead,
+      })));
+    }).catch(() => {});
+  }, [user?.id]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAllRead = () => {
+    notifications.filter(n => !n.read).forEach(n => notificationsApi.markStaffRead(parseInt(n.id)).catch(() => {}));
     setNotifications(notifications.map(n => ({ ...n, read: true })));
   };
 
   const markAsRead = (id: string) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+    notificationsApi.markStaffRead(parseInt(id)).catch(() => {});
+    setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
   return (

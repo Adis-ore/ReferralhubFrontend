@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { connecteamApi } from '@/services/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,10 +27,6 @@ import {
   FaDollarSign,
 } from 'react-icons/fa';
 import { toast } from 'sonner';
-import { importedHours } from '@/data/mockData';
-
-// For demo: show hours for user id=1 (staff login demo user)
-const myHours = importedHours.slice(0, 5);
 const shiftTypeColors: Record<string, string> = {
   regular: 'bg-muted text-muted-foreground',
   overtime: 'bg-warning/10 text-warning',
@@ -64,10 +61,16 @@ export default function StaffProfile() {
 
   const [editingBank, setEditingBank] = useState(false);
   const [bankName, setBankName] = useState('GTBank');
-  const [accountNumber, setAccountNumber] = useState('1234567890');
+  const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState(user?.name || '');
-  const [hasBankAccount, setHasBankAccount] = useState(true);
+  const [hasBankAccount, setHasBankAccount] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [myHours, setMyHours] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    connecteamApi.getHours({ userId: user.id, limit: 5 }).then(({ data }: any) => setMyHours(data || [])).catch(() => {});
+  }, [user?.id]);
 
   const handleLogout = () => {
     logout();

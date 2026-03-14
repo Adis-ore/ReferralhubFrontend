@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -9,7 +10,7 @@ import {
   FaClock,
   FaDownload,
 } from 'react-icons/fa';
-import { connecteamSyncLogs } from '@/data/mockData';
+import { connecteamApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -23,13 +24,28 @@ const formatDate = (iso: string) =>
   });
 
 export default function ConnecteamLogs() {
-  const successCount = connecteamSyncLogs.filter((l) => l.status === 'success').length;
-  const failedCount = connecteamSyncLogs.filter((l) => l.status === 'failed').length;
-  const totalImported = connecteamSyncLogs.reduce((s, l) => s + l.recordsImported, 0);
+  const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    connecteamApi.getLogs()
+      .then((res) => {
+        setSyncLogs(res.data);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load sync logs');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const successCount = syncLogs.filter((l) => l.status === 'success').length;
+  const failedCount = syncLogs.filter((l) => l.status === 'failed').length;
+  const totalImported = syncLogs.reduce((s, l) => s + (l.recordsImported ?? 0), 0);
 
   const handleExport = () => {
     const headers = ['ID', 'Synced At', 'Status', 'Records Fetched', 'Records Imported', 'Records Failed', 'Duration', 'Triggered By', 'Error'];
-    const rows = connecteamSyncLogs.map((l) => [
+    const rows = syncLogs.map((l) => [
       l.id,
       l.syncedAt,
       l.status,
@@ -63,7 +79,7 @@ export default function ConnecteamLogs() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="kpi-card before:bg-accent">
             <p className="text-xs text-muted-foreground">Total Syncs</p>
-            <p className="text-2xl font-semibold mt-1">{connecteamSyncLogs.length}</p>
+            <p className="text-2xl font-semibold mt-1">{syncLogs.length}</p>
           </div>
           <div className="kpi-card before:bg-success">
             <p className="text-xs text-muted-foreground">Successful</p>
@@ -107,7 +123,9 @@ export default function ConnecteamLogs() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {connecteamSyncLogs.map((log) => (
+                {loading ? (
+                  <tr><td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">Loading sync logs...</td></tr>
+                ) : syncLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 md:px-6 py-3 font-mono text-xs text-muted-foreground">{log.id}</td>
                     <td className="px-4 md:px-6 py-3">

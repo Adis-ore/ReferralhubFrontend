@@ -1,7 +1,7 @@
 // Frontend API service - all data fetched from the backend
 // Base URL from environment variable, falls back to localhost:3001 in development
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000/api';
 
 function getToken(): string | null {
   return localStorage.getItem('admin_token') || localStorage.getItem('staff_token');
@@ -118,4 +118,65 @@ export const connecteamApi = {
 // ─── Health ──────────────────────────────────────────────────────────────────
 export const healthApi = {
   check: () => request<any>('/health'),
+};
+
+// ─── Programs ─────────────────────────────────────────────────────────────────
+export const programsApi = {
+  list: (params: Record<string, any> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<any[]>(`/programs?${qs}`);
+  },
+  create: (data: Record<string, any>) =>
+    request<any>('/programs', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: Record<string, any>) =>
+    request<any>(`/programs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: number) =>
+    request<any>(`/programs/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export const notificationsApi = {
+  getAdmin: () => request<any[]>('/notifications/admin'),
+  markAdminRead: (id: number) =>
+    request<any>(`/notifications/admin/${id}/read`, { method: 'PATCH' }),
+  deleteAdmin: (id: number) =>
+    request<any>(`/notifications/admin/${id}`, { method: 'DELETE' }),
+  getStaff: (userId: number | string) => request<any[]>(`/notifications/staff/${userId}`),
+  markStaffRead: (id: number) =>
+    request<any>(`/notifications/staff/${id}/read`, { method: 'PATCH' }),
+};
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+export const reportsApi = {
+  list: () => request<any[]>('/reports'),
+  create: (data: Record<string, any>) =>
+    request<any>('/reports', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: Record<string, any>) =>
+    request<any>(`/reports/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: number) =>
+    request<any>(`/reports/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+export const dashboardApi = {
+  getStats: () => request<any>('/dashboard/stats'),
+};
+
+// ─── Point Transactions ───────────────────────────────────────────────────────
+export const pointTransactionsApi = {
+  list: (params: Record<string, any> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<{ data: any[]; meta: any }>(`/point-transactions?${qs}`);
+  },
+};
+
+// ─── Admins ───────────────────────────────────────────────────────────────────
+export const adminsApi = {
+  list: () => request<any[]>('/admins'),
+  create: (data: Record<string, any>) =>
+    request<any>('/admins', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Record<string, any>) =>
+    request<any>(`/admins/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) =>
+    request<any>(`/admins/${id}`, { method: 'DELETE' }),
 };

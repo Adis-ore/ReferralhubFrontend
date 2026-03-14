@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { pointTransactionsApi, usersApi } from '@/services/api';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FaClock, FaGift, FaChartLine, FaFilter } from 'react-icons/fa';
 import { FiSettings } from 'react-icons/fi';
@@ -35,15 +37,30 @@ const typeConfig: Record<TransactionType, { icon: React.ComponentType<{ classNam
 };
 
 export default function StaffPoints() {
+  const { user } = useStaffAuth();
   const [activeTab, setActiveTab] = useState('all');
+  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
+  const [balance, setBalance] = useState(0);
 
-  const totalEarned = mockTransactions.filter(t => t.type === 'earned').reduce((sum, t) => sum + t.amount, 0);
-  const pendingPoints = mockTransactions.filter(t => t.type === 'pending').reduce((sum, t) => sum + t.amount, 0);
-  const withdrawnPoints = Math.abs(mockTransactions.filter(t => t.type === 'withdrawn').reduce((sum, t) => sum + t.amount, 0));
+  useEffect(() => {
+    if (!user?.id) return;
+    usersApi.get(user.id).then((u: any) => setBalance(u.pointsBalance || 0)).catch(() => {});
+    pointTransactionsApi.list({ userId: user.id, limit: 50 }).then(({ data }: any) => {
+      if (data?.length) setTransactions(data.map((t: any) => ({
+        id: t.id, type: t.type as TransactionType,
+        amount: t.points, description: t.description,
+        date: t.createdAt?.split('T')[0] || '',
+      })));
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const totalEarned = transactions.filter(t => t.type === 'earned' || t.type === 'referral' as any || t.type === 'hours' as any).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const pendingPoints = transactions.filter(t => t.type === 'pending').reduce((sum, t) => sum + t.amount, 0);
+  const withdrawnPoints = Math.abs(transactions.filter(t => t.type === 'withdrawn').reduce((sum, t) => sum + t.amount, 0));
 
   const getFilteredTransactions = () => {
-    if (activeTab === 'all') return mockTransactions;
-    return mockTransactions.filter(t => t.type === activeTab);
+    if (activeTab === 'all') return transactions;
+    return transactions.filter(t => t.type === activeTab);
   };
 
   return (

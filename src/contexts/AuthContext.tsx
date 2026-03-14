@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { adminLogin as apiAdminLogin } from '@/services/mockApi';
+import { authApi } from '@/services/api';
 
 export type UserRole = 'super_admin' | 'finance_admin' | 'operations_admin' | 'manager' | 'read_only';
 
@@ -84,24 +84,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const login = async (email: string, password: string) => {
-    const result = await apiAdminLogin(email, password);
-
-    if (!result.success) {
-      throw new Error(result.message);
-    }
+    const result = await authApi.adminLogin(email, password);
 
     const loggedInUser: User = {
-      id: result.data.user.id,
-      name: result.data.user.name,
-      email: result.data.user.email,
-      role: result.data.user.role as UserRole,
-      permissions: result.data.user.permissions,
+      id: result.user.id,
+      name: result.user.name,
+      email: result.user.email,
+      role: result.user.role as UserRole,
+      permissions: result.user.permissions,
     };
 
     setUser(loggedInUser);
-    setToken(result.data.token);
+    setToken(result.token);
     localStorage.setItem('admin_user', JSON.stringify(loggedInUser));
-    localStorage.setItem('admin_token', result.data.token);
+    localStorage.setItem('admin_token', result.token);
   };
 
   const logout = () => {

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { reportsApi } from '@/services/api';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,7 +19,7 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 
-const savedReports = [
+const liveReports = [
   { id: '1', name: 'Monthly Referral Summary', type: 'referrals', schedule: 'Monthly', lastRun: '2024-06-01', status: 'active' },
   { id: '2', name: 'Weekly Points Distribution', type: 'points', schedule: 'Weekly', lastRun: '2024-06-10', status: 'active' },
   { id: '3', name: 'Quarterly Payout Report', type: 'payouts', schedule: 'Quarterly', lastRun: '2024-04-01', status: 'active' },
@@ -38,6 +39,16 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState('builder');
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [dateRange, setDateRange] = useState('30d');
+  const [liveReports, setLiveReports] = useState(liveReports);
+
+  useEffect(() => {
+    reportsApi.list().then((data: any[]) => {
+      if (data?.length) setLiveReports(data.map(r => ({
+        id: String(r.id), name: r.name, type: r.type,
+        schedule: r.schedule, lastRun: r.lastRun?.split('T')[0] || '', status: r.status,
+      })));
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -55,7 +66,7 @@ export default function Reports() {
             </TabsTrigger>
             <TabsTrigger value="saved">
               <FileText className="w-4 h-4 mr-2" />
-              Saved Reports ({savedReports.length})
+              Saved Reports ({liveReports.length})
             </TabsTrigger>
             <TabsTrigger value="scheduled">
               <Clock className="w-4 h-4 mr-2" />
@@ -182,7 +193,7 @@ export default function Reports() {
                 </Button>
               </div>
               <div className="divide-y divide-border">
-                {savedReports.map((report) => (
+                {liveReports.map((report) => (
                   <div key={report.id} className="px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="p-3 rounded-lg bg-muted">
@@ -224,7 +235,7 @@ export default function Reports() {
                 </Button>
               </div>
               <div className="divide-y divide-border">
-                {savedReports.filter(r => r.schedule !== 'On-demand').map((report) => (
+                {liveReports.filter(r => r.schedule !== 'On-demand').map((report) => (
                   <div key={report.id} className="px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="p-3 rounded-lg bg-accent/10 text-accent">

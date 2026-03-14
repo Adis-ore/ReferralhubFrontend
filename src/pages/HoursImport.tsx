@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -19,10 +19,29 @@ import {
   FaTimes,
   FaInfoCircle,
 } from 'react-icons/fa';
-import { importedHours as mockImportedHours } from '@/data/mockData';
+import { connecteamApi } from '@/services/api';
 import { toast } from 'sonner';
 
-type HoursRecord = typeof mockImportedHours[0];
+type HoursRecord = {
+  id: string;
+  userId: number | string;
+  userName: string;
+  classification: string;
+  shiftDate: string;
+  clockIn: string;
+  clockOut: string;
+  hoursWorked: number;
+  shiftType: string;
+  multiplier: number;
+  pointsToAward: number;
+  status: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  hourlyRate: number;
+  professionRate: number;
+  connecteamShiftId: string;
+};
 
 const shiftTypeLabels: Record<string, string> = {
   regular: 'Regular',
@@ -39,13 +58,46 @@ const shiftTypeColors: Record<string, string> = {
 };
 
 export default function HoursImport() {
-  const [records, setRecords] = useState<HoursRecord[]>(mockImportedHours as HoursRecord[]);
+  const [records, setRecords] = useState<HoursRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [shiftFilter, setShiftFilter] = useState('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: 'approve' | 'reject' | 'bulk_approve'; ids: string[] } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailRecord, setDetailRecord] = useState<HoursRecord | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    connecteamApi.getHours()
+      .then((res) => {
+        const mapped: HoursRecord[] = res.data.map((h: any) => ({
+          id: String(h.id),
+          userId: h.userId,
+          userName: h.userName ?? '',
+          classification: h.classification ?? '',
+          shiftDate: h.shiftDate ?? '',
+          clockIn: h.clockIn ?? '',
+          clockOut: h.clockOut ?? '',
+          hoursWorked: h.hoursWorked ?? 0,
+          shiftType: h.shiftType ?? 'regular',
+          multiplier: h.multiplier ?? 1,
+          pointsToAward: h.pointsToAward ?? 0,
+          status: h.status ?? 'pending',
+          approvedBy: h.approvedBy,
+          approvedAt: h.approvedAt,
+          rejectionReason: h.rejectionReason,
+          hourlyRate: h.hourlyRate ?? 0,
+          professionRate: h.professionRate ?? 0,
+          connecteamShiftId: String(h.connecteamShiftId ?? ''),
+        }));
+        setRecords(mapped);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load hours');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const pending = records.filter((r) => r.status === 'pending');
   const approved = records.filter((r) => r.status === 'approved');
@@ -60,37 +112,84 @@ export default function HoursImport() {
   };
 
   const handleApprove = (ids: string[]) => {
-    setRecords((prev) =>
-      prev.map((r) =>
-        ids.includes(r.id)
-          ? { ...r, status: 'approved', approvedBy: 'admin-1', approvedAt: new Date().toISOString() }
-          : r
-      )
-    );
-    setSelectedIds(new Set());
-    setConfirmAction(null);
-    toast.success(`${ids.length} record${ids.length > 1 ? 's' : ''} approved. Points will be awarded.`);
+    const approvePromises = ids.length === 1
+      ? [connecteamApi.approveHours(ids[0], { status: 'approved', approvedBy: 'admin-1', approvedAt: new Date().toISOString() })]
+      : [connecteamApi.bulkApproveHours(ids, 'admin-1')];
+
+    Promise.all(approvePromises)
+      .then(() => {
+        setRecords((prev) =>
+          prev.map((r) =>
+            ids.includes(r.id)
+              ? { ...r, status: 'approved', approvedBy: 'admin-1', approvedAt: new Date().toISOString() }
+              : r
+          )
+        );
+        setSelectedIds(new Set());
+        setConfirmAction(null);
+        toast.success(`${ids.length} record${ids.length > 1 ? 's' : ''} approved. Points will be awarded.`);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to approve records');
+      });
   };
 
   const handleReject = (ids: string[]) => {
-    setRecords((prev) =>
-      prev.map((r) =>
-        ids.includes(r.id)
-          ? { ...r, status: 'rejected', rejectionReason: 'Rejected by admin', approvedAt: new Date().toISOString() }
-          : r
-      )
+    const rejectPromises = ids.map((id) =>
+      connecteamApi.approveHours(id, { status: 'rejected', rejectionReason: 'Rejected by admin', approvedAt: new Date().toISOString() })
     );
-    setSelectedIds(new Set());
-    setConfirmAction(null);
-    toast.success(`${ids.length} record${ids.length > 1 ? 's' : ''} rejected.`);
+    Promise.all(rejectPromises)
+      .then(() => {
+        setRecords((prev) =>
+          prev.map((r) =>
+            ids.includes(r.id)
+              ? { ...r, status: 'rejected', rejectionReason: 'Rejected by admin', approvedAt: new Date().toISOString() }
+              : r
+          )
+        );
+        setSelectedIds(new Set());
+        setConfirmAction(null);
+        toast.success(`${ids.length} record${ids.length > 1 ? 's' : ''} rejected.`);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to reject records');
+      });
   };
 
   const handleSync = async () => {
     setIsSyncing(true);
-    setTimeout(() => {
-      setIsSyncing(false);
-      toast.success('Sync complete. 0 new records found (demo mode - no API key configured).');
-    }, 2000);
+    connecteamApi.sync()
+      .then(() => {
+        return connecteamApi.getHours();
+      })
+      .then((res) => {
+        const mapped: HoursRecord[] = res.data.map((h: any) => ({
+          id: String(h.id),
+          userId: h.userId,
+          userName: h.userName ?? '',
+          classification: h.classification ?? '',
+          shiftDate: h.shiftDate ?? '',
+          clockIn: h.clockIn ?? '',
+          clockOut: h.clockOut ?? '',
+          hoursWorked: h.hoursWorked ?? 0,
+          shiftType: h.shiftType ?? 'regular',
+          multiplier: h.multiplier ?? 1,
+          pointsToAward: h.pointsToAward ?? 0,
+          status: h.status ?? 'pending',
+          approvedBy: h.approvedBy,
+          approvedAt: h.approvedAt,
+          rejectionReason: h.rejectionReason,
+          hourlyRate: h.hourlyRate ?? 0,
+          professionRate: h.professionRate ?? 0,
+          connecteamShiftId: String(h.connecteamShiftId ?? ''),
+        }));
+        setRecords(mapped);
+        toast.success('Sync complete.');
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Sync failed');
+      })
+      .finally(() => setIsSyncing(false));
   };
 
   const toggleSelect = (id: string) => {
@@ -278,13 +377,15 @@ export default function HoursImport() {
             <div className="audit-card">
               <div className="audit-card-header flex items-center justify-between">
                 <h3 className="font-semibold text-sm">Pending Records</h3>
-                {pendingFiltered.length > 0 && (
+                {!loading && pendingFiltered.length > 0 && (
                   <Button variant="ghost" size="sm" className="text-xs" onClick={() => toggleSelectAll(pendingFiltered)}>
                     {pendingFiltered.every((r) => selectedIds.has(r.id)) ? 'Deselect all' : 'Select all'}
                   </Button>
                 )}
               </div>
-              {pendingFiltered.length === 0 ? (
+              {loading ? (
+                <div className="p-12 text-center text-muted-foreground">Loading hours...</div>
+              ) : pendingFiltered.length === 0 ? (
                 <div className="p-12 text-center">
                   <FaCheckCircle className="w-10 h-10 text-success/30 mx-auto mb-3" />
                   <p className="text-muted-foreground">No pending records</p>

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { programsApi } from '@/services/api';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,98 +46,22 @@ interface ReferralProgram {
   createdAt: string;
 }
 
-const mockPrograms: ReferralProgram[] = [
-  {
-    id: 'RP-001',
-    name: 'Standard Referral Program',
-    description: 'Earn points for every successful referral who completes their onboarding and works minimum required hours.',
-    pointsPerReferral: 200,
-    bonusPoints: 500,
-    bonusThreshold: 5,
-    minHoursRequired: 40,
-    maxReferrals: null,
-    status: 'active',
-    startDate: '2024-01-01',
-    totalReferrals: 245,
-    totalPointsAwarded: 62500,
-    participantCount: 42,
-    createdBy: 'Sarah Chen',
-    createdAt: '2023-12-15',
-  },
-  {
-    id: 'RP-002',
-    name: 'Summer Boost Campaign',
-    description: 'Double points for referrals during the summer period. Limited time offer to boost hiring during peak season.',
-    pointsPerReferral: 400,
-    bonusPoints: 1000,
-    bonusThreshold: 3,
-    minHoursRequired: 20,
-    maxReferrals: 10,
-    status: 'active',
-    startDate: '2024-06-01',
-    endDate: '2024-08-31',
-    totalReferrals: 58,
-    totalPointsAwarded: 28000,
-    participantCount: 28,
-    createdBy: 'Operations Admin',
-    createdAt: '2024-05-20',
-  },
-  {
-    id: 'RP-003',
-    name: 'Nursing Specialist Referral',
-    description: 'Premium points for referring registered nurses. Higher reward tier for critical staffing needs.',
-    pointsPerReferral: 500,
-    bonusPoints: 1500,
-    bonusThreshold: 3,
-    minHoursRequired: 60,
-    maxReferrals: null,
-    status: 'active',
-    startDate: '2024-03-01',
-    totalReferrals: 32,
-    totalPointsAwarded: 19500,
-    participantCount: 18,
-    createdBy: 'Sarah Chen',
-    createdAt: '2024-02-20',
-  },
-  {
-    id: 'RP-004',
-    name: 'Q1 Referral Sprint',
-    description: 'First quarter referral competition with accelerated rewards.',
-    pointsPerReferral: 300,
-    bonusPoints: 800,
-    bonusThreshold: 4,
-    minHoursRequired: 30,
-    maxReferrals: 15,
-    status: 'expired',
-    startDate: '2024-01-01',
-    endDate: '2024-03-31',
-    totalReferrals: 89,
-    totalPointsAwarded: 35600,
-    participantCount: 35,
-    createdBy: 'Operations Admin',
-    createdAt: '2023-12-20',
-  },
-  {
-    id: 'RP-005',
-    name: 'Driver Recruitment Push',
-    description: 'Targeted referral program for driver positions with competitive rewards.',
-    pointsPerReferral: 350,
-    bonusPoints: 700,
-    bonusThreshold: 3,
-    minHoursRequired: 40,
-    maxReferrals: null,
-    status: 'paused',
-    startDate: '2024-04-01',
-    totalReferrals: 12,
-    totalPointsAwarded: 4900,
-    participantCount: 8,
-    createdBy: 'Sarah Chen',
-    createdAt: '2024-03-25',
-  },
-];
 
 export default function ReferralPrograms() {
-  const [programs, setPrograms] = useState(mockPrograms);
+  const [programs, setPrograms] = useState<ReferralProgram[]>([]);
+
+  useEffect(() => {
+    programsApi.list().then((data: any[]) => setPrograms(data.map(p => ({
+      ...p,
+      id: String(p.id),
+      status: p.isActive ? 'active' : 'paused',
+      bonusThreshold: p.bonusThreshold ?? 5,
+      maxReferrals: p.maxReferrals ?? null,
+      totalReferrals: p.totalReferrals ?? 0,
+      totalPointsAwarded: p.totalPointsAwarded ?? 0,
+      createdBy: p.createdBy ?? '',
+    })))).catch(() => toast.error('Failed to load programs'));
+  }, []);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedProgram, setSelectedProgram] = useState<ReferralProgram | null>(null);
@@ -165,50 +91,45 @@ export default function ReferralPrograms() {
   const totalPoints = programs.reduce((sum, p) => sum + p.totalPointsAwarded, 0);
   const totalParticipants = new Set(programs.flatMap(p => Array(p.participantCount).fill(0).map((_, i) => `${p.id}-${i}`))).size;
 
-  const handleCreateProgram = () => {
+  const handleCreateProgram = async () => {
     if (!formName || !formStartDate) return;
-    const newProgram: ReferralProgram = {
-      id: `RP-${String(programs.length + 1).padStart(3, '0')}`,
-      name: formName,
-      description: formDescription,
-      pointsPerReferral: parseInt(formPointsPerReferral) || 200,
-      bonusPoints: parseInt(formBonusPoints) || 500,
-      bonusThreshold: parseInt(formBonusThreshold) || 5,
-      minHoursRequired: parseInt(formMinHours) || 40,
-      maxReferrals: null,
-      status: 'draft',
-      startDate: formStartDate,
-      endDate: formEndDate || undefined,
-      totalReferrals: 0,
-      totalPointsAwarded: 0,
-      participantCount: 0,
-      createdBy: 'Current Admin',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setPrograms(prev => [newProgram, ...prev]);
+    try {
+      const created = await programsApi.create({
+        name: formName, description: formDescription,
+        pointsPerReferral: parseInt(formPointsPerReferral) || 200,
+        bonusPoints: parseInt(formBonusPoints) || 500,
+        bonusThreshold: parseInt(formBonusThreshold) || 5,
+        minHoursRequired: parseInt(formMinHours) || 40,
+        isActive: false, startDate: formStartDate,
+        endDate: formEndDate || null,
+        totalReferrals: 0, totalPointsAwarded: 0, participantCount: 0,
+      });
+      setPrograms(prev => [{ ...created, id: String(created.id), status: 'paused', bonusThreshold: created.bonusThreshold ?? 5, maxReferrals: null, totalReferrals: 0, totalPointsAwarded: 0, createdBy: '', createdAt: created.createdAt }, ...prev]);
+      toast.success('Program created');
+    } catch { toast.error('Failed to create program'); }
     setShowCreate(false);
-    setFormName('');
-    setFormDescription('');
-    setFormPointsPerReferral('200');
-    setFormBonusPoints('500');
-    setFormBonusThreshold('5');
-    setFormMinHours('40');
-    setFormStartDate('');
-    setFormEndDate('');
+    setFormName(''); setFormDescription(''); setFormPointsPerReferral('200');
+    setFormBonusPoints('500'); setFormBonusThreshold('5'); setFormMinHours('40');
+    setFormStartDate(''); setFormEndDate('');
   };
 
-  const toggleProgramStatus = (id: string) => {
-    setPrograms(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      if (p.status === 'active') return { ...p, status: 'paused' as const };
-      if (p.status === 'paused' || p.status === 'draft') return { ...p, status: 'active' as const };
-      return p;
-    }));
+  const toggleProgramStatus = async (id: string) => {
+    const p = programs.find(p => p.id === id);
+    if (!p) return;
+    const isActive = p.status !== 'active';
+    try {
+      await programsApi.update(parseInt(id), { isActive });
+      setPrograms(prev => prev.map(p => p.id === id ? { ...p, status: isActive ? 'active' : 'paused' } : p));
+    } catch { toast.error('Failed to update program'); }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedProgram) return;
-    setPrograms(prev => prev.filter(p => p.id !== selectedProgram.id));
+    try {
+      await programsApi.remove(parseInt(selectedProgram.id));
+      setPrograms(prev => prev.filter(p => p.id !== selectedProgram.id));
+      toast.success('Program deleted');
+    } catch { toast.error('Failed to delete program'); }
     setShowDeleteConfirm(false);
     setSelectedProgram(null);
   };

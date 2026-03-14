@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,8 +18,7 @@ import {
   FaInfoCircle,
   FaClock,
 } from 'react-icons/fa';
-import { connecteamSettings as defaultSettings } from '@/data/mockData';
-import { testConnection } from '@/services/connecteamApi';
+import { connecteamApi } from '@/services/api';
 import { toast } from 'sonner';
 
 const multiplierLabels: Record<string, string> = {
@@ -30,20 +29,43 @@ const multiplierLabels: Record<string, string> = {
 };
 
 export default function ConnecteamSettings() {
-  const [apiKey, setApiKey] = useState(defaultSettings.apiKey);
-  const [orgId, setOrgId] = useState(defaultSettings.organizationId);
-  const [webhookUrl, setWebhookUrl] = useState(defaultSettings.webhookUrl);
-  const [syncFrequency, setSyncFrequency] = useState(defaultSettings.syncFrequency);
-  const [autoSync, setAutoSync] = useState(defaultSettings.autoSync);
+  const [apiKey, setApiKey] = useState('');
+  const [orgId, setOrgId] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [syncFrequency, setSyncFrequency] = useState('daily');
+  const [autoSync, setAutoSync] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [isConnected, setIsConnected] = useState(defaultSettings.isConnected);
+  const [isConnected, setIsConnected] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [multipliers, setMultipliers] = useState({ ...defaultSettings.shiftMultipliers });
+  const [multipliers, setMultipliers] = useState<Record<string, number>>({
+    regular: 1,
+    overtime: 1.5,
+    weekend: 1.5,
+    public_holiday: 2,
+  });
+  const [lastSync, setLastSync] = useState<string | null>(null);
+
+  useEffect(() => {
+    connecteamApi.getSettings()
+      .then((data) => {
+        setApiKey(data.apiKey ?? '');
+        setOrgId(data.organizationId ?? '');
+        setWebhookUrl(data.webhookUrl ?? '');
+        setSyncFrequency(data.syncFrequency ?? 'daily');
+        setAutoSync(data.autoSync ?? false);
+        setIsConnected(data.isConnected ?? false);
+        if (data.shiftMultipliers) setMultipliers({ ...data.shiftMultipliers });
+        if (data.lastSync) setLastSync(data.lastSync);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load Connecteam settings');
+      });
+  }, []);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
     try {
-      const result = await testConnection(apiKey, orgId);
+      const result = await connecteamApi.testConnection(apiKey, orgId);
       if (result.success) {
         setIsConnected(true);
         toast.success(result.message);
@@ -64,7 +86,20 @@ export default function ConnecteamSettings() {
       toast.error('API Key and Organization ID are required');
       return;
     }
-    toast.success('Connecteam settings saved');
+    connecteamApi.updateSettings({
+      apiKey,
+      organizationId: orgId,
+      webhookUrl,
+      syncFrequency,
+      autoSync,
+      shiftMultipliers: multipliers,
+    })
+      .then(() => {
+        toast.success('Connecteam settings saved');
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to save settings');
+      });
   };
 
   const updateMultiplier = (key: string, value: string) => {
@@ -95,7 +130,7 @@ export default function ConnecteamSettings() {
             </p>
             <p className="text-xs text-muted-foreground">
               {isConnected
-                ? `Last sync: ${new Date(defaultSettings.lastSync).toLocaleString()}`
+                ? `Last sync: ${lastSync ? new Date(lastSync).toLocaleString() : 'N/A'}`
                 : 'Enter your API credentials below and test the connection'}
             </p>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { importedHours } from '@/data/mockData';
+import { usersApi, connecteamApi } from '@/services/api';
 
 const shiftTypeColors: Record<string, string> = {
   regular: 'bg-muted text-muted-foreground',
@@ -45,63 +45,36 @@ const shiftTypeLabels: Record<string, string> = {
   public_holiday: 'Public Holiday',
 };
 
-// Filter hours for user 1 (mockUser) for demo
-const userHours = importedHours.filter((h) => h.userId === 1);
-
-const mockUser = {
-  id: '1',
-  name: 'Sarah Johnson',
-  email: 'sarah.johnson@company.com',
-  phone: '+61 412 345 678',
-  classification: 'Registered Nurse',
-  location: 'Sydney',
-  department: 'Aged Care',
-  employeeId: 'EMP-2847',
-  joinedDate: '2024-01-15',
-  lastActiveDate: '2026-02-05',
-  status: 'active' as const,
-  referrer: { name: 'Michael Chen', id: '2' },
-  referralsMade: 8,
-  totalPoints: 4000,
-  availablePoints: 2500,
-  pendingPoints: 500,
-  withdrawnPoints: 1000,
-  lastUpdated: '2024-06-15 14:30',
-  updatedBy: 'System Sync',
-  bankAccount: {
-    bankName: 'GTBank',
-    accountNumber: '1234567890',
-    accountName: 'Sarah Johnson',
-  },
-};
-
-const referrals = [
-  { id: '1', name: 'Emma Williams', date: '2024-05-20', status: 'completed', points: 500 },
-  { id: '2', name: 'James Park', date: '2024-04-15', status: 'completed', points: 500 },
-  { id: '3', name: 'Alex Thompson', date: '2024-06-01', status: 'pending', points: 0 },
-];
-
-const pointsHistory = [
-  { id: '1', type: 'earned', amount: 500, description: 'Referral bonus - Emma Williams', date: '2024-05-25' },
-  { id: '2', type: 'earned', amount: 500, description: 'Referral bonus - James Park', date: '2024-04-20' },
-  { id: '3', type: 'withdrawn', amount: -1000, description: 'Withdrawal request #WR-1234', date: '2024-04-01' },
-  { id: '4', type: 'pending', amount: 500, description: 'Pending - Alex Thompson (probation)', date: '2024-06-01' },
-];
-
-const withdrawalHistory = [
-  { id: 'WR-1234', amount: 1000, status: 'paid', requestedDate: '2024-03-28', paidDate: '2024-04-01' },
-  { id: 'WR-1189', amount: 500, status: 'paid', requestedDate: '2024-02-15', paidDate: '2024-02-20' },
-];
-
 export default function UserDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user: adminUser } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
+  const [userHours, setUserHours] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustType, setAdjustType] = useState<'add' | 'deduct'>('add');
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
-  const [currentPoints, setCurrentPoints] = useState(mockUser.availablePoints);
+  const [currentPoints, setCurrentPoints] = useState(0);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    Promise.all([
+      usersApi.get(id),
+      connecteamApi.getHours({ userId: id }),
+    ])
+      .then(([user, hoursRes]) => {
+        setUserData(user);
+        setCurrentPoints(user.pointsBalance ?? 0);
+        setUserHours(hoursRes.data ?? []);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load user details');
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const canAdjustPoints = adminUser?.role === 'super_admin' || adminUser?.role === 'finance_admin';
 
@@ -110,19 +83,50 @@ export default function UserDetail() {
     if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
     if (!adjustReason || adjustReason.length < 5) { toast.error('Provide a reason (min 5 characters)'); return; }
     if (adjustType === 'deduct' && amount > currentPoints) { toast.error('Cannot deduct more than available points'); return; }
-    const newPoints = adjustType === 'add' ? currentPoints + amount : currentPoints - amount;
-    setCurrentPoints(newPoints);
-    setShowAdjustModal(false);
-    setAdjustAmount('');
-    setAdjustReason('');
-    toast.success(`Points ${adjustType === 'add' ? 'added' : 'deducted'}. New balance: ${newPoints.toLocaleString()}`);
+    usersApi.adjustPoints(id!, adjustType, amount, adjustReason)
+      .then(() => {
+        const newPoints = adjustType === 'add' ? currentPoints + amount : currentPoints - amount;
+        setCurrentPoints(newPoints);
+        setShowAdjustModal(false);
+        setAdjustAmount('');
+        setAdjustReason('');
+        toast.success(`Points ${adjustType === 'add' ? 'added' : 'deducted'}. New balance: ${newPoints.toLocaleString()}`);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to adjust points');
+      });
   };
 
   const handleExport = (section: string) => { toast.success(`${section} exported as PDF`); };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="User Details" subtitle="Loading..." />
+        <div className="p-4 md:p-6">
+          <div className="py-12 text-center text-muted-foreground">Loading user details...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="User Details" subtitle="Not found" />
+        <div className="p-4 md:p-6">
+          <div className="py-12 text-center text-muted-foreground">User not found.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const userName = `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim();
+  const userReferrals: any[] = userData.referrals ?? [];
+
   return (
     <div className="min-h-screen">
-      <AdminHeader title="User Details" subtitle={`User ID: ${mockUser.employeeId}`} />
+      <AdminHeader title="User Details" subtitle={`User ID: ${userData.employeeId ?? id}`} />
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <Button variant="ghost" onClick={() => navigate('/users')} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Back to Users
@@ -135,24 +139,24 @@ export default function UserDetail() {
               <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6">
                 <Avatar className="h-16 w-16 md:h-20 md:w-20">
                   <AvatarFallback className="bg-primary/10 text-primary text-xl md:text-2xl">
-                    {mockUser.name.split(' ').map(n => n[0]).join('')}
+                    {userName.split(' ').map((n: string) => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h2 className="text-xl md:text-2xl font-semibold">{mockUser.name}</h2>
-                    <StatusBadge status={mockUser.status} />
+                    <h2 className="text-xl md:text-2xl font-semibold">{userName}</h2>
+                    <StatusBadge status={userData.isActive ? 'active' : 'inactive'} />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-4 h-4 shrink-0" /><span className="truncate">{mockUser.email}</span></div>
-                    <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="w-4 h-4 shrink-0" />{mockUser.location}</div>
-                    <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="w-4 h-4 shrink-0" />{mockUser.classification}</div>
-                    <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 shrink-0" />Joined {mockUser.joinedDate}</div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-4 h-4 shrink-0" /><span className="truncate">{userData.email}</span></div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="w-4 h-4 shrink-0" />{userData.location}</div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Briefcase className="w-4 h-4 shrink-0" />{userData.classification}</div>
+                    <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 shrink-0" />Joined {userData.joinDate ? userData.joinDate.split('T')[0] : ''}</div>
                   </div>
-                  {mockUser.referrer && (
+                  {userData.referrer && (
                     <div className="mt-3 flex items-center gap-2">
                       <Gift className="w-4 h-4 text-accent" />
-                      <span className="text-sm">Referred by <button className="text-accent hover:underline">{mockUser.referrer.name}</button></span>
+                      <span className="text-sm">Referred by <button className="text-accent hover:underline">{userData.referrer.name}</button></span>
                     </div>
                   )}
                 </div>
@@ -164,7 +168,7 @@ export default function UserDetail() {
             </div>
           </div>
           <div className="audit-card-footer">
-            <AuditInfo updatedAt={mockUser.lastUpdated} updatedBy={mockUser.updatedBy} onViewHistory={() => {}} />
+            <AuditInfo updatedAt={userData.updatedAt ?? ''} updatedBy={userData.updatedBy ?? 'System'} onViewHistory={() => {}} />
           </div>
         </div>
 
@@ -172,11 +176,11 @@ export default function UserDetail() {
         <div className="audit-card">
           <div className="audit-card-header"><div className="flex items-center gap-2"><FaUniversity className="w-4 h-4 text-muted-foreground" /><h3 className="font-semibold text-sm">Bank Account Details</h3></div></div>
           <div className="audit-card-body">
-            {mockUser.bankAccount ? (
+            {userData.bankAccount ? (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                <div><p className="text-muted-foreground mb-1">Bank Name</p><p className="font-medium">{mockUser.bankAccount.bankName}</p></div>
-                <div><p className="text-muted-foreground mb-1">Account Number</p><p className="font-mono font-medium">{mockUser.bankAccount.accountNumber}</p></div>
-                <div><p className="text-muted-foreground mb-1">Account Name</p><p className="font-medium">{mockUser.bankAccount.accountName}</p></div>
+                <div><p className="text-muted-foreground mb-1">Bank Name</p><p className="font-medium">{userData.bankAccount.bankName}</p></div>
+                <div><p className="text-muted-foreground mb-1">Account Number</p><p className="font-mono font-medium">{userData.bankAccount.accountNumber}</p></div>
+                <div><p className="text-muted-foreground mb-1">Account Name</p><p className="font-medium">{userData.bankAccount.accountName}</p></div>
               </div>
             ) : (<p className="text-sm text-muted-foreground">No bank account details on file.</p>)}
           </div>
@@ -184,25 +188,25 @@ export default function UserDetail() {
 
         {/* Points Summary */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <div className="kpi-card before:bg-accent"><p className="text-xs md:text-sm text-muted-foreground">Total Points</p><p className="text-lg md:text-2xl font-semibold mt-1">{mockUser.totalPoints.toLocaleString()}</p></div>
+          <div className="kpi-card before:bg-accent"><p className="text-xs md:text-sm text-muted-foreground">Total Points</p><p className="text-lg md:text-2xl font-semibold mt-1">{(userData.pointsBalance ?? 0).toLocaleString()}</p></div>
           <div className="kpi-card before:bg-success">
             <div className="flex items-center justify-between"><p className="text-xs md:text-sm text-muted-foreground">Available</p>{canAdjustPoints && <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setShowAdjustModal(true)}>Adjust</Button>}</div>
             <p className="text-lg md:text-2xl font-semibold mt-1">{currentPoints.toLocaleString()}</p>
           </div>
-          <div className="kpi-card before:bg-warning"><p className="text-xs md:text-sm text-muted-foreground">Pending</p><p className="text-lg md:text-2xl font-semibold mt-1">{mockUser.pendingPoints.toLocaleString()}</p></div>
-          <div className="kpi-card before:bg-info"><p className="text-xs md:text-sm text-muted-foreground">Withdrawn</p><p className="text-lg md:text-2xl font-semibold mt-1">{mockUser.withdrawnPoints.toLocaleString()}</p></div>
+          <div className="kpi-card before:bg-warning"><p className="text-xs md:text-sm text-muted-foreground">Pending</p><p className="text-lg md:text-2xl font-semibold mt-1">{(userData.pendingPoints ?? 0).toLocaleString()}</p></div>
+          <div className="kpi-card before:bg-info"><p className="text-xs md:text-sm text-muted-foreground">Withdrawn</p><p className="text-lg md:text-2xl font-semibold mt-1">{(userData.withdrawnPoints ?? 0).toLocaleString()}</p></div>
         </div>
 
         {/* Tabs */}
         <Tabs defaultValue="referrals" className="space-y-4 md:space-y-6">
-          <TabsList className="w-full sm:w-auto flex-wrap h-auto gap-1"><TabsTrigger value="referrals">Referrals ({referrals.length})</TabsTrigger><TabsTrigger value="points">Points History</TabsTrigger><TabsTrigger value="withdrawals">Withdrawals</TabsTrigger><TabsTrigger value="work-hours">Work Hours ({userHours.length})</TabsTrigger></TabsList>
+          <TabsList className="w-full sm:w-auto flex-wrap h-auto gap-1"><TabsTrigger value="referrals">Referrals ({userReferrals.length})</TabsTrigger><TabsTrigger value="points">Points History</TabsTrigger><TabsTrigger value="withdrawals">Withdrawals</TabsTrigger><TabsTrigger value="work-hours">Work Hours ({userHours.length})</TabsTrigger></TabsList>
           <TabsContent value="referrals">
             <div className="audit-card">
               <div className="audit-card-header flex items-center justify-between"><h3 className="font-semibold">Referrals Made</h3><Button variant="outline" size="sm" onClick={() => handleExport('Referrals')}><FaDownload className="w-3.5 h-3.5 mr-1.5" />PDF</Button></div>
-              <div className="divide-y divide-border">{referrals.map((ref) => (
+              <div className="divide-y divide-border">{userReferrals.map((ref: any) => (
                 <div key={ref.id} className="px-4 md:px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3 md:gap-4"><Avatar className="h-8 w-8 md:h-10 md:w-10"><AvatarFallback className="bg-accent/10 text-accent text-xs">{ref.name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar><div><p className="font-medium text-sm">{ref.name}</p><p className="text-xs text-muted-foreground">Referred on {ref.date}</p></div></div>
-                  <div className="flex items-center gap-2 md:gap-4"><StatusBadge status={ref.status === 'completed' ? 'approved' : 'pending'} label={ref.status} />{ref.points > 0 && <div className="flex items-center gap-1.5"><Coins className="w-4 h-4 text-warning" /><span className="font-medium text-sm">+{ref.points}</span></div>}</div>
+                  <div className="flex items-center gap-3 md:gap-4"><Avatar className="h-8 w-8 md:h-10 md:w-10"><AvatarFallback className="bg-accent/10 text-accent text-xs">{(ref.refereeName ?? '').split(' ').map((n: string) => n[0]).join('')}</AvatarFallback></Avatar><div><p className="font-medium text-sm">{ref.refereeName}</p><p className="text-xs text-muted-foreground">Referred on {ref.submittedDate ? ref.submittedDate.split('T')[0] : ''}</p></div></div>
+                  <div className="flex items-center gap-2 md:gap-4"><StatusBadge status={ref.status === 'completed' ? 'approved' : 'pending'} label={ref.status} />{ref.pointsAwarded > 0 && <div className="flex items-center gap-1.5"><Coins className="w-4 h-4 text-warning" /><span className="font-medium text-sm">+{ref.pointsAwarded}</span></div>}</div>
                 </div>
               ))}</div>
             </div>
@@ -210,7 +214,7 @@ export default function UserDetail() {
           <TabsContent value="points">
             <div className="audit-card">
               <div className="audit-card-header flex items-center justify-between"><h3 className="font-semibold">Points History</h3><Button variant="outline" size="sm" onClick={() => handleExport('Points History')}><FaDownload className="w-3.5 h-3.5 mr-1.5" />PDF</Button></div>
-              <div className="divide-y divide-border">{pointsHistory.map((item) => (
+              <div className="divide-y divide-border">{(userData.pointsHistory ?? []).map((item: any) => (
                 <div key={item.id} className="px-4 md:px-6 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3 md:gap-4"><div className={`p-2 rounded-lg ${item.type === 'earned' ? 'bg-success/10 text-success' : item.type === 'withdrawn' ? 'bg-info/10 text-info' : 'bg-warning/10 text-warning'}`}><Coins className="w-4 h-4" /></div><div><p className="font-medium text-sm">{item.description}</p><p className="text-xs text-muted-foreground">{item.date}</p></div></div>
                   <span className={`font-semibold text-sm ${item.amount > 0 ? 'text-success' : 'text-foreground'}`}>{item.amount > 0 ? '+' : ''}{item.amount.toLocaleString()}</span>
@@ -221,10 +225,10 @@ export default function UserDetail() {
           <TabsContent value="withdrawals">
             <div className="audit-card">
               <div className="audit-card-header flex items-center justify-between"><h3 className="font-semibold">Withdrawal History</h3><Button variant="outline" size="sm" onClick={() => handleExport('Withdrawal History')}><FaDownload className="w-3.5 h-3.5 mr-1.5" />PDF</Button></div>
-              <div className="divide-y divide-border">{withdrawalHistory.map((item) => (
+              <div className="divide-y divide-border">{(userData.withdrawals ?? []).map((item: any) => (
                 <div key={item.id} className="px-4 md:px-6 py-4 flex items-center justify-between">
-                  <div><p className="font-medium text-sm">Withdrawal #{item.id}</p><p className="text-xs text-muted-foreground">Requested: {item.requestedDate} | Paid: {item.paidDate}</p></div>
-                  <div className="flex items-center gap-2 md:gap-4"><StatusBadge status={item.status as any} /><span className="font-semibold text-sm">${item.amount.toLocaleString()}</span></div>
+                  <div><p className="font-medium text-sm">Withdrawal #{item.id}</p><p className="text-xs text-muted-foreground">Requested: {item.requestedDate ? item.requestedDate.split('T')[0] : ''} | Paid: {item.paidDate ? item.paidDate.split('T')[0] : ''}</p></div>
+                  <div className="flex items-center gap-2 md:gap-4"><StatusBadge status={item.status as any} /><span className="font-semibold text-sm">${(item.amount ?? item.finalAmount ?? 0).toLocaleString()}</span></div>
                 </div>
               ))}</div>
             </div>
@@ -276,7 +280,7 @@ export default function UserDetail() {
       {/* Points Adjustment Modal */}
       <Dialog open={showAdjustModal} onOpenChange={setShowAdjustModal}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Adjust Points</DialogTitle><DialogDescription>Adjust {mockUser.name}'s available points. Current balance: {currentPoints.toLocaleString()} pts</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Adjust Points</DialogTitle><DialogDescription>Adjust {userName}'s available points. Current balance: {currentPoints.toLocaleString()} pts</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex gap-2">
               <Button variant={adjustType === 'add' ? 'default' : 'outline'} onClick={() => setAdjustType('add')} className="flex-1" size="sm"><FaPlus className="w-3.5 h-3.5 mr-1.5" />Add Points</Button>

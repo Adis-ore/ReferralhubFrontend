@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { FaUsers, FaEye, FaCheck, FaTimes, FaClock, FaSearch, FaFilter, FaDownload } from 'react-icons/fa';
+import { referralsApi } from '@/services/api';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface Referral {
@@ -22,53 +24,6 @@ interface Referral {
   notes?: string;
 }
 
-const mockReferrals: Referral[] = [
-  {
-    id: '1',
-    referrerName: 'Adewale Johnson',
-    refereeName: 'John Smith',
-    refereeEmail: 'john.smith@example.com',
-    refereePhone: '+234 803 123 4567',
-    status: 'pending',
-    pointsAwarded: 0,
-    submittedDate: '2024-06-15',
-  },
-  {
-    id: '2',
-    referrerName: 'Chioma Okafor',
-    refereeName: 'Sarah Williams',
-    refereeEmail: 'sarah.williams@example.com',
-    refereePhone: '+234 806 987 6543',
-    status: 'approved',
-    pointsAwarded: 0,
-    submittedDate: '2024-06-10',
-    processedDate: '2024-06-12',
-  },
-  {
-    id: '3',
-    referrerName: 'Oluwaseun Adebayo',
-    refereeName: 'Michael Brown',
-    refereeEmail: 'michael.brown@example.com',
-    refereePhone: '+234 810 456 7890',
-    status: 'completed',
-    pointsAwarded: 500,
-    submittedDate: '2024-06-01',
-    processedDate: '2024-06-15',
-    notes: 'Successfully onboarded and completed 30 days',
-  },
-  {
-    id: '4',
-    referrerName: 'Blessing Eze',
-    refereeName: 'Emily Davis',
-    refereeEmail: 'emily.davis@example.com',
-    refereePhone: '+234 813 234 5678',
-    status: 'rejected',
-    pointsAwarded: 0,
-    submittedDate: '2024-06-05',
-    processedDate: '2024-06-07',
-    notes: 'Duplicate entry - candidate already referred',
-  },
-];
 
 const statusConfig = {
   pending: { label: 'Pending Review', className: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20' },
@@ -78,11 +33,37 @@ const statusConfig = {
 };
 
 export default function Referrals() {
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredReferrals = mockReferrals.filter((referral) => {
+  useEffect(() => {
+    setLoading(true);
+    referralsApi.list()
+      .then((res) => {
+        const mapped: Referral[] = res.data.map((r: any) => ({
+          id: String(r.id),
+          referrerName: r.referrerName ?? '',
+          refereeName: r.refereeName ?? '',
+          refereeEmail: r.refereeEmail ?? '',
+          refereePhone: r.refereePhone ?? '',
+          status: r.status,
+          pointsAwarded: r.pointsAwarded ?? 0,
+          submittedDate: r.submittedDate ? r.submittedDate.split('T')[0] : '',
+          processedDate: r.processedDate ? r.processedDate.split('T')[0] : undefined,
+          notes: r.notes,
+        }));
+        setReferrals(mapped);
+      })
+      .catch((err) => {
+        toast.error(err.message || 'Failed to load referrals');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredReferrals = referrals.filter((referral) => {
     const matchesStatus = statusFilter === 'all' || referral.status === statusFilter;
     const matchesSearch =
       referral.referrerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -267,6 +248,10 @@ export default function Referrals() {
 
         {/* Table - Responsive */}
         <div className="bg-card border border-border rounded-lg overflow-hidden">
+          {loading ? (
+            <div className="p-8 text-center text-muted-foreground">Loading referrals...</div>
+          ) : (
+          <>
           <div className="hidden md:block">
             <DataTable
               columns={columns}
@@ -317,6 +302,8 @@ export default function Referrals() {
               ))
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
 

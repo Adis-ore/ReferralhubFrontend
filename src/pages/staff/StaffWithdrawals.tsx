@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStaffAuth } from '@/contexts/StaffAuthContext';
+import { withdrawalsApi, usersApi, pointsApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -78,13 +80,34 @@ const mockWithdrawals: Withdrawal[] = [
 ];
 
 export default function StaffWithdrawals() {
+  const { user } = useStaffAuth();
   const [activeTab, setActiveTab] = useState('request');
   const [withdrawPoints, setWithdrawPoints] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const [availablePoints, setAvailablePoints] = useState(2500);
+  const [availablePoints, setAvailablePoints] = useState(0);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(mockWithdrawals);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    usersApi.get(user.id).then((u: any) => setAvailablePoints(u.pointsBalance || 0)).catch(() => {});
+    withdrawalsApi.list({ limit: 50 }).then(({ data }: any) => {
+      const mine = data?.filter((w: any) => w.userId === user.id);
+      if (mine?.length) setWithdrawals(mine.map((w: any) => ({
+        id: w.id, pointsWithdrawn: w.points || 0,
+        conversionRate: currentConversionRate.pointsPerUnit,
+        currencySymbol: '$', currencyCode: 'AUD',
+        finalAmount: w.amount || 0,
+        status: w.status as Withdrawal['status'],
+        requestedDate: w.createdAt?.split('T')[0] || '',
+        processedDate: w.processedAt?.split('T')[0],
+      })));
+    }).catch(() => {});
+    pointsApi.getSettings().then((s: any) => {
+      if (s?.pointsPerUnit) currentConversionRate.pointsPerUnit = s.pointsPerUnit;
+    }).catch(() => {});
+  }, [user?.id]);
   const minWithdrawalPoints = 100;
   const maxWithdrawalPoints = 2500;
 

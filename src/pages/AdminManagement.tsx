@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { adminsApi } from '@/services/api';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,62 +68,21 @@ interface AdminUser {
   createdDate: string;
 }
 
-const mockAdmins: AdminUser[] = [
-  {
-    id: 'admin-1',
-    name: 'Sarah Chen',
-    email: 'admin@company.com',
-    role: 'super_admin',
-    permissions: allPermissions.map(p => p.id),
-    status: 'active',
-    lastLogin: '2024-06-15 09:30',
-    createdDate: '2023-01-15',
-  },
-  {
-    id: 'admin-2',
-    name: 'Michael Torres',
-    email: 'michael.torres@company.com',
-    role: 'finance_admin',
-    permissions: ['view_users', 'approve_withdrawals', 'adjust_points', 'export_data', 'access_reports'],
-    status: 'active',
-    lastLogin: '2024-06-14 14:20',
-    createdDate: '2023-03-20',
-  },
-  {
-    id: 'admin-3',
-    name: 'Emma Williams',
-    email: 'emma.williams@company.com',
-    role: 'operations_admin',
-    permissions: ['view_users', 'edit_users', 'access_reports', 'view_audit_logs'],
-    status: 'active',
-    lastLogin: '2024-06-13 11:45',
-    createdDate: '2023-06-10',
-  },
-  {
-    id: 'admin-4',
-    name: 'David Park',
-    email: 'david.park@company.com',
-    role: 'manager',
-    permissions: ['view_users', 'access_reports'],
-    status: 'active',
-    lastLogin: '2024-06-12 16:00',
-    createdDate: '2024-01-05',
-  },
-  {
-    id: 'admin-5',
-    name: 'Rachel Adams',
-    email: 'rachel.adams@company.com',
-    role: 'read_only',
-    permissions: ['view_users'],
-    status: 'suspended',
-    lastLogin: '2024-05-20 08:15',
-    createdDate: '2024-02-15',
-  },
-];
 
 export default function AdminManagement() {
   const { user } = useAuth();
-  const [admins, setAdmins] = useState<AdminUser[]>(mockAdmins);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+
+  useEffect(() => {
+    adminsApi.list().then((data: any[]) => setAdmins(data.map(a => ({
+      id: a.id, name: a.name, email: a.email,
+      role: a.role as UserRole,
+      permissions: a.permissions || [],
+      status: a.isActive === false ? 'suspended' : 'active',
+      lastLogin: a.lastLogin ? new Date(a.lastLogin).toLocaleString() : 'Never',
+      createdDate: a.createdAt?.split('T')[0] || '',
+    })))).catch(() => toast.error('Failed to load admins'));
+  }, []);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null);
@@ -156,51 +117,46 @@ export default function AdminManagement() {
     setShowEditSheet(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedAdmin) return;
-    setAdmins(prev => prev.map(a =>
-      a.id === selectedAdmin.id
-        ? { ...a, role: editRole, permissions: editPermissions }
-        : a
-    ));
+    try {
+      await adminsApi.update(selectedAdmin.id, { role: editRole, permissions: editPermissions });
+      setAdmins(prev => prev.map(a => a.id === selectedAdmin.id ? { ...a, role: editRole, permissions: editPermissions } : a));
+      toast.success('Admin updated');
+    } catch { toast.error('Failed to update admin'); }
     setShowEditSheet(false);
     setSelectedAdmin(null);
   };
 
-  const handleAddAdmin = () => {
+  const handleAddAdmin = async () => {
     if (!newName || !newEmail) return;
-    const newAdmin: AdminUser = {
-      id: `admin-${Date.now()}`,
-      name: newName,
-      email: newEmail,
-      role: newRole,
-      permissions: newPermissions,
-      status: 'active',
-      lastLogin: 'Never',
-      createdDate: new Date().toISOString().split('T')[0],
-    };
-    setAdmins(prev => [...prev, newAdmin]);
+    try {
+      const created = await adminsApi.create({ name: newName, email: newEmail, role: newRole, permissions: newPermissions, password: 'admin123' });
+      setAdmins(prev => [...prev, { id: created.id, name: created.name, email: created.email, role: created.role as UserRole, permissions: created.permissions || [], status: 'active', lastLogin: 'Never', createdDate: new Date().toISOString().split('T')[0] }]);
+      toast.success('Admin added');
+    } catch { toast.error('Failed to add admin'); }
     setShowAddSheet(false);
-    setNewName('');
-    setNewEmail('');
-    setNewRole('read_only');
-    setNewPermissions(['view_users']);
+    setNewName(''); setNewEmail(''); setNewRole('read_only'); setNewPermissions(['view_users']);
   };
 
-  const handleDeleteAdmin = () => {
+  const handleDeleteAdmin = async () => {
     if (!selectedAdmin) return;
-    setAdmins(prev => prev.filter(a => a.id !== selectedAdmin.id));
+    try {
+      await adminsApi.remove(selectedAdmin.id);
+      setAdmins(prev => prev.filter(a => a.id !== selectedAdmin.id));
+      toast.success('Admin deleted');
+    } catch { toast.error('Failed to delete admin'); }
     setShowDeleteConfirm(false);
     setSelectedAdmin(null);
   };
 
-  const handleToggleSuspend = () => {
+  const handleToggleSuspend = async () => {
     if (!selectedAdmin) return;
-    setAdmins(prev => prev.map(a =>
-      a.id === selectedAdmin.id
-        ? { ...a, status: a.status === 'active' ? 'suspended' : 'active' }
-        : a
-    ));
+    const isActive = selectedAdmin.status === 'suspended';
+    try {
+      await adminsApi.update(selectedAdmin.id, { isActive });
+      setAdmins(prev => prev.map(a => a.id === selectedAdmin.id ? { ...a, status: isActive ? 'active' : 'suspended' } : a));
+    } catch { toast.error('Failed to update admin status'); }
     setShowSuspendConfirm(false);
     setSelectedAdmin(null);
   };
