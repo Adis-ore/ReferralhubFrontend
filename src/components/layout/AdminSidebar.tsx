@@ -1,0 +1,293 @@
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import {
+  FaTachometerAlt as LayoutDashboard,
+  FaUsers as Users,
+  FaCalendar as Calendar,
+  FaGift as Gift,
+  FaCoins as Coins,
+  FaCreditCard as CreditCard,
+  FaBell as Bell,
+  FaChartBar as BarChart3,
+  FaFileAlt as FileText,
+  FaShieldAlt as Shield,
+  FaUserShield,
+  FaChevronDown as ChevronDown,
+  FaChevronRight as ChevronRight,
+  FaSignOutAlt as LogOut,
+  FaBolt as Zap,
+  FaPlug,
+  FaHourglassHalf,
+  FaHistory,
+} from 'react-icons/fa';
+import { FiSettings as Settings } from 'react-icons/fi';
+import { cn } from '@/lib/utils';
+import { useAuth, roleLabels, roleStyles, UserRole } from '@/contexts/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles?: UserRole[];
+  children?: NavItem[];
+}
+
+const navigation: NavItem[] = [
+  {
+    title: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Users',
+    href: '/users',
+    icon: Users,
+  },
+  {
+    title: 'Referrals',
+    href: '/referrals',
+    icon: Gift,
+  },
+  {
+    title: 'Shifts & Hours',
+    href: '/shifts',
+    icon: Calendar,
+    roles: ['super_admin', 'operations_admin', 'manager'],
+  },
+  {
+    title: 'Referral Programs',
+    href: '/programs',
+    icon: Gift,
+    roles: ['super_admin', 'operations_admin'],
+  },
+  {
+    title: 'Points & Currency',
+    href: '/points-config',
+    icon: Coins,
+    roles: ['super_admin', 'finance_admin'],
+  },
+  {
+    title: 'Withdrawals',
+    href: '/withdrawals',
+    icon: CreditCard,
+    roles: ['super_admin', 'finance_admin'],
+  },
+  {
+    title: 'Notifications',
+    href: '/notifications',
+    icon: Bell,
+    roles: ['super_admin', 'operations_admin'],
+  },
+  {
+    title: 'Reports',
+    href: '/reports',
+    icon: BarChart3,
+  },
+  {
+    title: 'Audit Logs',
+    href: '/audit',
+    icon: FileText,
+  },
+  {
+    title: 'Admin Management',
+    href: '/admin-management',
+    icon: FaUserShield,
+    roles: ['super_admin'],
+  },
+  {
+    title: 'Hours Import',
+    href: '/hours-import',
+    icon: FaHourglassHalf,
+    roles: ['super_admin', 'operations_admin', 'finance_admin'],
+  },
+  {
+    title: 'Sync Logs',
+    href: '/connecteam-logs',
+    icon: FaHistory,
+    roles: ['super_admin', 'operations_admin'],
+  },
+  {
+    title: 'Connecteam Settings',
+    href: '/connecteam-settings',
+    icon: FaPlug,
+    roles: ['super_admin'],
+  },
+  {
+    title: 'Configuration',
+    href: '/settings',
+    icon: Settings,
+    roles: ['super_admin'],
+  },
+  {
+    title: 'Super Admin',
+    href: '/override',
+    icon: Shield,
+    roles: ['super_admin'],
+  },
+];
+
+interface AdminSidebarProps {
+  onNavigate?: () => void;
+}
+
+export function AdminSidebar({ onNavigate }: AdminSidebarProps = {}) {
+  const { user, logout, setUserRole } = useAuth();
+  const location = useLocation();
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  const toggleExpanded = (title: string) => {
+    setExpandedItems(prev =>
+      prev.includes(title)
+        ? prev.filter(t => t !== title)
+        : [...prev, title]
+    );
+  };
+
+  const isActive = (href: string) => location.pathname === href || location.pathname.startsWith(href + '/');
+
+  const canAccess = (item: NavItem) => {
+    if (!item.roles) return true;
+    return user && item.roles.includes(user.role);
+  };
+
+  const filteredNavigation = navigation.filter(canAccess);
+
+  return (
+    <aside className="w-64 h-screen bg-sidebar flex flex-col border-r border-sidebar-border">
+      {/* Logo */}
+      <div className="h-16 flex items-center px-6 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
+            <Zap className="w-5 h-5 text-sidebar-primary-foreground" />
+          </div>
+          <span className="font-semibold text-sidebar-foreground text-lg">
+            ReferralHub
+          </span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3">
+        <ul className="space-y-1">
+          {filteredNavigation.map((item) => (
+            <li key={item.title}>
+              {item.children ? (
+                <div>
+                  <button
+                    onClick={() => toggleExpanded(item.title)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      isActive(item.href)
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.title}</span>
+                    </div>
+                    {expandedItems.includes(item.title) ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+                  {expandedItems.includes(item.title) && (
+                    <ul className="mt-1 ml-4 space-y-1">
+                      {item.children.filter(canAccess).map((child) => (
+                        <li key={child.href}>
+                          <NavLink
+                          onClick={onNavigate}
+                            to={child.href}
+                            className={({ isActive }) =>
+                              cn(
+                                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                                isActive
+                                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                  : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                              )
+                            }
+                          >
+                            <child.icon className="w-4 h-4" />
+                            <span>{child.title}</span>
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <NavLink
+                  onClick={onNavigate}
+                  to={item.href}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    )
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.title}</span>
+                </NavLink>
+              )}
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* User Profile */}
+      <div className="p-3 border-t border-sidebar-border">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-sidebar-accent/50 transition-colors">
+              <Avatar className="h-9 w-9">
+                <AvatarImage src={user?.avatar} />
+                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
+                  {user?.name?.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-sidebar-foreground">
+                  {user?.name}
+                </p>
+                <span className={cn('role-badge text-[10px] mt-1', user && roleStyles[user.role])}>
+                  {user && roleLabels[user.role]}
+                </span>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Switch Role (Demo)</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {Object.entries(roleLabels).map(([role, label]) => (
+              <DropdownMenuItem
+                key={role}
+                onClick={() => setUserRole(role as UserRole)}
+                className={cn(user?.role === role && 'bg-accent/10')}
+              >
+                {label}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-destructive">
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </aside>
+  );
+}
