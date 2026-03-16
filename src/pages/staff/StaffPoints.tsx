@@ -6,6 +6,7 @@ import { FaClock, FaGift, FaChartLine, FaFilter } from 'react-icons/fa';
 import { FiSettings } from 'react-icons/fi';
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
+import { SkeletonList, SkeletonStatCards } from '@/components/ui/skeletons';
 
 type TransactionType = 'earned' | 'pending' | 'withdrawn' | 'adjusted';
 
@@ -41,17 +42,20 @@ export default function StaffPoints() {
   const [activeTab, setActiveTab] = useState('all');
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
   const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
-    usersApi.get(user.id).then((u: any) => setBalance(u.pointsBalance || 0)).catch(() => {});
-    pointTransactionsApi.list({ userId: user.id, limit: 50 }).then(({ data }: any) => {
-      if (data?.length) setTransactions(data.map((t: any) => ({
-        id: t.id, type: t.type as TransactionType,
-        amount: t.points, description: t.description,
-        date: t.createdAt?.split('T')[0] || '',
-      })));
-    }).catch(() => {});
+    Promise.all([
+      usersApi.get(user.id).then((u: any) => setBalance(u.pointsBalance || 0)).catch(() => {}),
+      pointTransactionsApi.list({ userId: user.id, limit: 50 }).then(({ data }: any) => {
+        if (data?.length) setTransactions(data.map((t: any) => ({
+          id: t.id, type: t.type as TransactionType,
+          amount: t.points, description: t.description,
+          date: t.createdAt?.split('T')[0] || '',
+        })));
+      }).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, [user?.id]);
 
   const totalEarned = transactions.filter(t => t.type === 'earned' || t.type === 'referral' as any || t.type === 'hours' as any).reduce((sum, t) => sum + Math.abs(t.amount), 0);
@@ -62,6 +66,13 @@ export default function StaffPoints() {
     if (activeTab === 'all') return transactions;
     return transactions.filter(t => t.type === activeTab);
   };
+
+  if (loading) return (
+    <div className="px-4 py-6 space-y-4">
+      <SkeletonStatCards count={3} />
+      <SkeletonList rows={5} />
+    </div>
+  );
 
   return (
     <div className="px-4 py-6">

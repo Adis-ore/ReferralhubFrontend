@@ -21,6 +21,7 @@ import {
 } from 'react-icons/fa';
 import { connecteamApi } from '@/services/api';
 import { toast } from 'sonner';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 type HoursRecord = {
   id: string;
@@ -279,6 +280,8 @@ export default function HoursImport() {
   );
 
   const pendingFiltered = filterRecords(pending);
+
+  if (loading) return <SkeletonPage rows={8} cols={5} />;
 
   return (
     <div className="min-h-screen">

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { FaPlus as Plus, FaDownload as Download, FaEye as Eye, FaGift as Gift, FaCoins as Coins } from 'react-icons/fa';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface User {
   id: string;
@@ -149,6 +150,8 @@ export default function Users() {
       ),
     },
   ];
+
+  if (loading) return <SkeletonPage rows={10} cols={5} />;
 
   return (
     <div className="min-h-screen">

@@ -28,6 +28,7 @@ import {
   FaEnvelopeOpen,
 } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 type NotificationType = 'system' | 'withdrawal' | 'referral' | 'points' | 'user' | 'security';
 
@@ -217,13 +218,14 @@ const mockBroadcasts: BroadcastMessage[] = [
 export default function AdminNotifications() {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [broadcasts, setBroadcasts] = useState<BroadcastMessage[]>(mockBroadcasts);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     notificationsApi.getAdmin().then((data: any[]) => setNotifications(data.map(n => ({
       id: String(n.id), title: n.title, message: n.message,
       type: n.type as NotificationType, priority: n.priority || 'normal',
       isRead: n.isRead, createdAt: n.createdAt,
-    })))).catch(() => toast.error('Failed to load notifications'));
+    })))).catch(() => toast.error('Failed to load notifications')).finally(() => setLoading(false));
   }, []);
   const [activeTab, setActiveTab] = useState('inbox');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -293,6 +295,8 @@ export default function AdminNotifications() {
     if (hours > 0) return `${hours}h ago`;
     return 'Just now';
   };
+
+  if (loading) return <SkeletonPage rows={6} cols={4} />;
 
   return (
     <div className="min-h-screen">

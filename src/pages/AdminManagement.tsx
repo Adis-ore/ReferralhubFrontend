@@ -30,6 +30,7 @@ import {
 } from 'react-icons/fa';
 import { useAuth, roleLabels, roleStyles, UserRole } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface Permission {
   id: string;
@@ -72,6 +73,7 @@ interface AdminUser {
 export default function AdminManagement() {
   const { user } = useAuth();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     adminsApi.list().then((data: any[]) => setAdmins(data.map(a => ({
@@ -81,7 +83,7 @@ export default function AdminManagement() {
       status: a.isActive === false ? 'suspended' : 'active',
       lastLogin: a.lastLogin ? new Date(a.lastLogin).toLocaleString() : 'Never',
       createdDate: a.createdAt?.split('T')[0] || '',
-    })))).catch(() => toast.error('Failed to load admins'));
+    })))).catch(() => toast.error('Failed to load admins')).finally(() => setLoading(false));
   }, []);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -229,6 +231,8 @@ export default function AdminManagement() {
       })}
     </div>
   );
+
+  if (loading) return <SkeletonPage rows={6} cols={4} />;
 
   return (
     <div className="min-h-screen">

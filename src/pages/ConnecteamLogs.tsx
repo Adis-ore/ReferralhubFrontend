@@ -13,6 +13,7 @@ import {
 import { connecteamApi } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('en-AU', {
@@ -26,6 +27,7 @@ const formatDate = (iso: string) =>
 export default function ConnecteamLogs() {
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     setLoading(true);
@@ -66,6 +68,8 @@ export default function ConnecteamLogs() {
     URL.revokeObjectURL(url);
     toast.success('Sync logs exported as CSV');
   };
+
+  if (loading) return <SkeletonPage rows={8} cols={4} />;
 
   return (
     <div className="min-h-screen">

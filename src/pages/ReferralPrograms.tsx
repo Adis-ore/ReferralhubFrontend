@@ -26,6 +26,7 @@ import {
   FaToggleOff,
 } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface ReferralProgram {
   id: string;
@@ -49,6 +50,7 @@ interface ReferralProgram {
 
 export default function ReferralPrograms() {
   const [programs, setPrograms] = useState<ReferralProgram[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     programsApi.list().then((data: any[]) => setPrograms(data.map(p => ({
@@ -60,7 +62,7 @@ export default function ReferralPrograms() {
       totalReferrals: p.totalReferrals ?? 0,
       totalPointsAwarded: p.totalPointsAwarded ?? 0,
       createdBy: p.createdBy ?? '',
-    })))).catch(() => toast.error('Failed to load programs'));
+    })))).catch(() => toast.error('Failed to load programs')).finally(() => setLoading(false));
   }, []);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -140,6 +142,8 @@ export default function ReferralPrograms() {
     draft: 'bg-muted text-muted-foreground border-border',
     expired: 'bg-muted/50 text-muted-foreground/60 border-border/50',
   };
+
+  if (loading) return <SkeletonPage rows={6} cols={4} />;
 
   return (
     <div className="min-h-screen">

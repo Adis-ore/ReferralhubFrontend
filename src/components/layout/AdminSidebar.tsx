@@ -12,6 +12,7 @@ import {
   FaFileAlt as FileText,
   FaShieldAlt as Shield,
   FaUserShield,
+  FaUserPlus,
   FaChevronDown as ChevronDown,
   FaChevronRight as ChevronRight,
   FaSignOutAlt as LogOut,
@@ -56,6 +57,12 @@ const navigation: NavItem[] = [
     title: 'Referrals',
     href: '/referrals',
     icon: Gift,
+  },
+  {
+    title: 'Register Referee',
+    href: '/referrals/register-new',
+    icon: FaUserPlus,
+    roles: ['super_admin', 'operations_admin'],
   },
   {
     title: 'Shifts & Hours',

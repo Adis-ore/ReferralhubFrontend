@@ -23,6 +23,7 @@ import {
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { SkeletonList } from '@/components/ui/skeletons';
 
 interface Withdrawal {
   id: string;
@@ -88,25 +89,28 @@ export default function StaffWithdrawals() {
 
   const [availablePoints, setAvailablePoints] = useState(0);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(mockWithdrawals);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
-    usersApi.get(user.id).then((u: any) => setAvailablePoints(u.pointsBalance || 0)).catch(() => {});
-    withdrawalsApi.list({ limit: 50 }).then(({ data }: any) => {
-      const mine = data?.filter((w: any) => w.userId === user.id);
-      if (mine?.length) setWithdrawals(mine.map((w: any) => ({
-        id: w.id, pointsWithdrawn: w.points || 0,
-        conversionRate: currentConversionRate.pointsPerUnit,
-        currencySymbol: '$', currencyCode: 'AUD',
-        finalAmount: w.amount || 0,
-        status: w.status as Withdrawal['status'],
-        requestedDate: w.createdAt?.split('T')[0] || '',
-        processedDate: w.processedAt?.split('T')[0],
-      })));
-    }).catch(() => {});
-    pointsApi.getSettings().then((s: any) => {
-      if (s?.pointsPerUnit) currentConversionRate.pointsPerUnit = s.pointsPerUnit;
-    }).catch(() => {});
+    Promise.all([
+      usersApi.get(user.id).then((u: any) => setAvailablePoints(u.pointsBalance || 0)).catch(() => {}),
+      withdrawalsApi.list({ limit: 50 }).then(({ data }: any) => {
+        const mine = data?.filter((w: any) => w.userId === user.id);
+        if (mine?.length) setWithdrawals(mine.map((w: any) => ({
+          id: w.id, pointsWithdrawn: w.points || 0,
+          conversionRate: currentConversionRate.pointsPerUnit,
+          currencySymbol: '$', currencyCode: 'AUD',
+          finalAmount: w.amount || 0,
+          status: w.status as Withdrawal['status'],
+          requestedDate: w.createdAt?.split('T')[0] || '',
+          processedDate: w.processedAt?.split('T')[0],
+        })));
+      }).catch(() => {}),
+      pointsApi.getSettings().then((s: any) => {
+        if (s?.pointsPerUnit) currentConversionRate.pointsPerUnit = s.pointsPerUnit;
+      }).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, [user?.id]);
   const minWithdrawalPoints = 100;
   const maxWithdrawalPoints = 2500;
@@ -153,6 +157,8 @@ export default function StaffWithdrawals() {
   };
 
   const quickPoints = [100, 250, 500, 1000];
+
+  if (loading) return <div className="px-4 py-6"><SkeletonList rows={4} /></div>;
 
   return (
     <div className="px-4 py-6">

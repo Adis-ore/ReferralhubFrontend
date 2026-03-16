@@ -29,6 +29,7 @@ import AdminNotifications from "./pages/AdminNotifications";
 import ConnecteamSettings from "./pages/ConnecteamSettings";
 import HoursImport from "./pages/HoursImport";
 import ConnecteamLogs from "./pages/ConnecteamLogs";
+import ReferralRegister from "./pages/ReferralRegister";
 import NotFound from "./pages/NotFound";
 
 // Staff Pages
@@ -97,6 +98,7 @@ function AppRoutes() {
         <Route path="users" element={<Users />} />
         <Route path="users/:id" element={<UserDetail />} />
         <Route path="referrals" element={<Referrals />} />
+        <Route path="referrals/register-new" element={<ReferralRegister />} />
         <Route path="shifts" element={<ShiftsHours />} />
         <Route path="programs" element={<ReferralPrograms />} />
         <Route path="notifications" element={<AdminNotifications />} />

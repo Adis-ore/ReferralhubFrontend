@@ -4,6 +4,7 @@ import { notificationsApi } from '@/services/api';
 import { FaBell, FaGift, FaCreditCard, FaCheck, FaClock, FaInfoCircle, FaTrashAlt } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SkeletonList } from '@/components/ui/skeletons';
 
 interface Notification {
   id: string;
@@ -33,6 +34,7 @@ const typeConfig: Record<string, { icon: React.ComponentType<{ className?: strin
 export default function StaffNotifications() {
   const { user } = useStaffAuth();
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -43,7 +45,7 @@ export default function StaffNotifications() {
         time: new Date(n.createdAt).toLocaleDateString(),
         read: n.isRead,
       })));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [user?.id]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -57,6 +59,8 @@ export default function StaffNotifications() {
     notificationsApi.markStaffRead(parseInt(id)).catch(() => {});
     setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
   };
+
+  if (loading) return <div className="px-4 py-6"><SkeletonList rows={5} /></div>;
 
   return (
     <div className="px-4 py-6">

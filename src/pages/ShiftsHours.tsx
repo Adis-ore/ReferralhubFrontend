@@ -25,6 +25,7 @@ import {
   FaExclamationTriangle,
 } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface Shift {
   id: string;
@@ -214,6 +215,8 @@ export default function ShiftsHours() {
   ];
 
   const filtered = getFilteredShifts();
+
+  if (loading) return <SkeletonPage rows={8} cols={5} />;
 
   return (
     <div className="min-h-screen">

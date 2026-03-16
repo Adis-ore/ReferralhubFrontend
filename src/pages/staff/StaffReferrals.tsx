@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FaUsers, FaClock, FaChevronRight } from 'react-icons/fa';
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
+import { SkeletonList } from '@/components/ui/skeletons';
 
 type ReferralStatus = 'invited' | 'working' | 'eligible' | 'completed';
 
@@ -47,6 +48,7 @@ export default function StaffReferrals() {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
   const [allReferrals, setAllReferrals] = useState<Referral[]>(mockReferrals);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -58,7 +60,7 @@ export default function StaffReferrals() {
         hoursCompleted: 0, hoursRequired: 120,
         pointsEarned: r.pointsAwarded || 0,
       })));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [user?.id]);
 
   const getFilteredReferrals = () => {
@@ -75,6 +77,8 @@ export default function StaffReferrals() {
   };
 
   const totalEarned = mockReferrals.reduce((sum, r) => sum + r.pointsEarned, 0);
+
+  if (loading) return <div className="px-4 py-6"><SkeletonList rows={5} /></div>;
 
   return (
     <div className="px-4 py-6">

@@ -4,6 +4,7 @@ import { connecteamApi } from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FaClock, FaCalendar, FaChartLine } from 'react-icons/fa';
 import { cn } from '@/lib/utils';
+import { SkeletonList } from '@/components/ui/skeletons';
 
 interface HoursPeriod {
   period: string;
@@ -33,6 +34,7 @@ export default function StaffHours() {
   const { user } = useStaffAuth();
   const [viewType, setViewType] = useState('weekly');
   const [hoursData, setHoursData] = useState(mockHours);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -44,11 +46,13 @@ export default function StaffHours() {
         hours: h.hoursWorked,
         status: h.status === 'approved' ? 'synced' : 'pending',
       })));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [user?.id]);
 
   const totalHoursThisMonth = hoursData.filter(h => h.status === 'synced').reduce((s, h) => s + h.hours, 0);
   const averageWeekly = hoursData.length ? Math.round(totalHoursThisMonth / Math.max(hoursData.length, 1)) : 0;
+
+  if (loading) return <div className="px-4 py-6"><SkeletonList rows={5} /></div>;
 
   return (
     <div className="px-4 py-6">

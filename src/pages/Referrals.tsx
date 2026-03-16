@@ -10,6 +10,7 @@ import { FaUsers, FaEye, FaCheck, FaTimes, FaClock, FaSearch, FaFilter, FaDownlo
 import { referralsApi } from '@/services/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface Referral {
   id: string;
@@ -154,6 +155,8 @@ export default function Referrals() {
     console.log('Complete referral:', selectedReferral?.id);
     setSelectedReferral(null);
   };
+
+  if (loading) return <SkeletonPage rows={8} cols={5} />;
 
   return (
     <div className="min-h-screen bg-background">

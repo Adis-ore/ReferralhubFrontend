@@ -18,6 +18,7 @@ import {
 } from 'react-icons/fa';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 const liveReports = [
   { id: '1', name: 'Monthly Referral Summary', type: 'referrals', schedule: 'Monthly', lastRun: '2024-06-01', status: 'active' },
@@ -40,6 +41,7 @@ export default function Reports() {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [dateRange, setDateRange] = useState('30d');
   const [liveReports, setLiveReports] = useState(liveReports);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     reportsApi.list().then((data: any[]) => {
@@ -47,8 +49,10 @@ export default function Reports() {
         id: String(r.id), name: r.name, type: r.type,
         schedule: r.schedule, lastRun: r.lastRun?.split('T')[0] || '', status: r.status,
       })));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  if (loading) return <SkeletonPage rows={6} cols={4} />;
 
   return (
     <div className="min-h-screen">

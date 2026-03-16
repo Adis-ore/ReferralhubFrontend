@@ -10,16 +10,27 @@ import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { dashboardApi } from '@/services/api';
+import { SkeletonKPICards } from '@/components/ui/skeletons';
 
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState('30d');
   const [location, setLocation] = useState('all');
   const [classification, setClassification] = useState('all');
   const [stats, setStats] = useState({ totalUsers: 0, totalReferrals: 0, totalPoints: 0, pendingWithdrawals: 0, hoursImportedToday: 0, pendingHours: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    dashboardApi.getStats().then(setStats).catch(() => {});
+    dashboardApi.getStats().then(setStats).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  if (loading) return (
+    <div className="min-h-screen">
+      <div className="h-16 border-b px-4 md:px-6 flex items-center" />
+      <div className="p-6 space-y-6">
+        <SkeletonKPICards count={6} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen">

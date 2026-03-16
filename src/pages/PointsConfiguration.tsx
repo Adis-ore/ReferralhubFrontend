@@ -30,6 +30,7 @@ import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { pointsApi } from '@/services/api';
 import { toast } from 'sonner';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface ProfessionRate {
   id: number;
@@ -104,6 +105,7 @@ export default function PointsConfiguration() {
   const [professionRates, setProfessionRates] = useState<ProfessionRate[]>([]);
   const [editingRateId, setEditingRateId] = useState<number | null>(null);
   const [editCashPerPoint, setEditCashPerPoint] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     pointsApi.getProfessionRates()
@@ -112,7 +114,8 @@ export default function PointsConfiguration() {
       })
       .catch((err) => {
         toast.error(err.message || 'Failed to load profession rates');
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   // New rate form
@@ -171,6 +174,8 @@ export default function PointsConfiguration() {
 
   const selectedCurrency = currencies.find(c => c.code === newCurrency);
   const previewValue = parseFloat(newPointsPerUnit) || 0;
+
+  if (loading) return <SkeletonPage rows={6} cols={4} />;
 
   return (
     <div className="min-h-screen">

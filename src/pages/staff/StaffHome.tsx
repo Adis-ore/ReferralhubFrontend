@@ -10,6 +10,7 @@ import { FaClock, FaWallet, FaChevronRight, FaGift, FaCopy, FaShare, FaChartLine
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { SkeletonStaffHome } from '@/components/ui/skeletons';
 
 const defaultRecentReferrals = [
   { id: '1', name: 'Emma Wilson', status: 'completed' as const, date: '2024-05-20' },
@@ -23,16 +24,19 @@ export default function StaffHome() {
   const [recentReferralsList, setRecentReferralsList] = useState(defaultRecentReferrals);
   const [totalPoints, setTotalPoints] = useState(0);
   const [availablePoints, setAvailablePoints] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
-    usersApi.get(user.id).then((u: any) => {
-      setTotalPoints(u.pointsBalance || 0);
-      setAvailablePoints(u.pointsBalance || 0);
-    }).catch(() => {});
-    referralsApi.list({ userId: user.id, limit: 3 }).then(({ data }: any) => {
-      if (data?.length) setRecentReferralsList(data.map((r: any) => ({ id: String(r.id), name: r.refereeName, status: r.status, date: r.createdAt?.split('T')[0] })));
-    }).catch(() => {});
+    Promise.all([
+      usersApi.get(user.id).then((u: any) => {
+        setTotalPoints(u.pointsBalance || 0);
+        setAvailablePoints(u.pointsBalance || 0);
+      }).catch(() => {}),
+      referralsApi.list({ userId: user.id, limit: 3 }).then(({ data }: any) => {
+        if (data?.length) setRecentReferralsList(data.map((r: any) => ({ id: String(r.id), name: r.refereeName, status: r.status, date: r.createdAt?.split('T')[0] })));
+      }).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, [user?.id]);
 
   const pendingPoints = 0;
@@ -44,6 +48,8 @@ export default function StaffHome() {
     toast.success('Referral code copied!');
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (loading) return <SkeletonStaffHome />;
 
   return (
     <div className="px-4 py-6 space-y-6">

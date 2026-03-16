@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { FiSettings } from 'react-icons/fi';
 import { GiTwoCoins } from 'react-icons/gi';
 import { cn } from '@/lib/utils';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface AuditLog {
   id: string;
@@ -151,6 +152,8 @@ export default function AuditLogs() {
       ),
     },
   ];
+
+  if (loading) return <SkeletonPage rows={10} cols={5} />;
 
   return (
     <div className="min-h-screen">

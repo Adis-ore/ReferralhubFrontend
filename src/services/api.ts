@@ -53,6 +53,13 @@ export const referralsApi = {
   get: (id: number | string) => request<any>(`/referrals/${id}`),
   update: (id: number | string, data: Record<string, any>) =>
     request<any>(`/referrals/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  searchReferrers: (params: Record<string, any> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<any[]>(`/referrals/search-referrers?${qs}`);
+  },
+  register: (data: Record<string, any>) =>
+    request<any>('/referrals/register-referee', { method: 'POST', body: JSON.stringify(data) }),
+  getTree: (userId: number | string) => request<any>(`/referrals/tree/${userId}`),
 };
 
 // ─── Withdrawals ─────────────────────────────────────────────────────────────
@@ -109,6 +116,8 @@ export const connecteamApi = {
     request<any>('/connecteam/hours/bulk-approve', { method: 'POST', body: JSON.stringify({ ids, approvedBy }) }),
   sync: (adminId?: string) =>
     request<any>('/connecteam/sync', { method: 'POST', body: JSON.stringify({ adminId }) }),
+  syncNow: (adminId?: string) =>
+    request<any>('/connecteam/sync-now', { method: 'POST', body: JSON.stringify({ adminId }) }),
   getLogs: (params: Record<string, any> = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request<{ data: any[]; meta: any }>(`/connecteam/logs?${qs}`);

@@ -27,6 +27,7 @@ import {
   FaDollarSign,
 } from 'react-icons/fa';
 import { toast } from 'sonner';
+import { SkeletonProfile } from '@/components/ui/skeletons';
 const shiftTypeColors: Record<string, string> = {
   regular: 'bg-muted text-muted-foreground',
   overtime: 'bg-warning/10 text-warning',
@@ -66,10 +67,11 @@ export default function StaffProfile() {
   const [hasBankAccount, setHasBankAccount] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [myHours, setMyHours] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
-    connecteamApi.getHours({ userId: user.id, limit: 5 }).then(({ data }: any) => setMyHours(data || [])).catch(() => {});
+    connecteamApi.getHours({ userId: user.id, limit: 5 }).then(({ data }: any) => setMyHours(data || [])).catch(() => {}).finally(() => setLoading(false));
   }, [user?.id]);
 
   const handleLogout = () => {
@@ -109,6 +111,8 @@ export default function StaffProfile() {
     };
     reader.readAsDataURL(file);
   };
+
+  if (loading) return <div className="px-4 py-6"><SkeletonProfile /></div>;
 
   return (
     <div className="px-4 py-6 space-y-6">

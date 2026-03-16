@@ -38,6 +38,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { withdrawalsApi } from '@/services/api';
 import { toast } from 'sonner';
+import { SkeletonPage } from '@/components/ui/skeletons';
 
 interface Withdrawal {
   id: string;
@@ -370,6 +371,8 @@ export default function Withdrawals() {
       ),
     },
   ];
+
+  if (loading) return <SkeletonPage rows={8} cols={5} />;
 
   return (
     <div className="min-h-screen">

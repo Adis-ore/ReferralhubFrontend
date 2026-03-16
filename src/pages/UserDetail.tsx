@@ -31,6 +31,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { usersApi, connecteamApi } from '@/services/api';
+import { ReferralTreeView } from '@/components/ReferralTreeView';
+import { SkeletonProfile, SkeletonTable } from '@/components/ui/skeletons';
 
 const shiftTypeColors: Record<string, string> = {
   regular: 'bg-muted text-muted-foreground',
@@ -102,9 +104,10 @@ export default function UserDetail() {
   if (loading) {
     return (
       <div className="min-h-screen">
-        <AdminHeader title="User Details" subtitle="Loading..." />
-        <div className="p-4 md:p-6">
-          <div className="py-12 text-center text-muted-foreground">Loading user details...</div>
+        <div className="h-16 border-b px-4 md:px-6 flex items-center" />
+        <div className="p-4 md:p-6 space-y-6">
+          <SkeletonProfile />
+          <SkeletonTable rows={5} cols={4} />
         </div>
       </div>
     );
@@ -199,7 +202,7 @@ export default function UserDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="referrals" className="space-y-4 md:space-y-6">
-          <TabsList className="w-full sm:w-auto flex-wrap h-auto gap-1"><TabsTrigger value="referrals">Referrals ({userReferrals.length})</TabsTrigger><TabsTrigger value="points">Points History</TabsTrigger><TabsTrigger value="withdrawals">Withdrawals</TabsTrigger><TabsTrigger value="work-hours">Work Hours ({userHours.length})</TabsTrigger></TabsList>
+          <TabsList className="w-full sm:w-auto flex-wrap h-auto gap-1"><TabsTrigger value="referrals">Referrals ({userReferrals.length})</TabsTrigger><TabsTrigger value="referral-tree">Referral Tree</TabsTrigger><TabsTrigger value="points">Points History</TabsTrigger><TabsTrigger value="withdrawals">Withdrawals</TabsTrigger><TabsTrigger value="work-hours">Work Hours ({userHours.length})</TabsTrigger></TabsList>
           <TabsContent value="referrals">
             <div className="audit-card">
               <div className="audit-card-header flex items-center justify-between"><h3 className="font-semibold">Referrals Made</h3><Button variant="outline" size="sm" onClick={() => handleExport('Referrals')}><FaDownload className="w-3.5 h-3.5 mr-1.5" />PDF</Button></div>
@@ -209,6 +212,20 @@ export default function UserDetail() {
                   <div className="flex items-center gap-2 md:gap-4"><StatusBadge status={ref.status === 'completed' ? 'approved' : 'pending'} label={ref.status} />{ref.pointsAwarded > 0 && <div className="flex items-center gap-1.5"><Coins className="w-4 h-4 text-warning" /><span className="font-medium text-sm">+{ref.pointsAwarded}</span></div>}</div>
                 </div>
               ))}</div>
+            </div>
+          </TabsContent>
+          <TabsContent value="referral-tree">
+            <div className="audit-card">
+              <div className="audit-card-header">
+                <div className="flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-muted-foreground" />
+                  <h3 className="font-semibold">Referral Tree</h3>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">People {userName} referred, and their sub-referrals</p>
+              </div>
+              <div className="audit-card-body">
+                <ReferralTreeView userId={parseInt(id!)} />
+              </div>
             </div>
           </TabsContent>
           <TabsContent value="points">
