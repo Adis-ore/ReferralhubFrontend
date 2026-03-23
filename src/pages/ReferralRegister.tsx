@@ -17,7 +17,9 @@ import {
   FaBriefcase,
   FaBarcode,
   FaTimes,
-  FaExclamationTriangle,
+  FaCalendar,
+  FaVenusMars,
+  FaBuilding,
 } from 'react-icons/fa';
 import { referralsApi } from '@/services/api';
 import { toast } from 'sonner';
@@ -39,6 +41,10 @@ interface FieldError {
   refereeEmail?: string;
   refereePhone?: string;
   classification?: string;
+  department?: string;
+  gender?: string;
+  dob?: string;
+  startDate?: string;
 }
 
 export default function ReferralRegister() {
@@ -47,6 +53,10 @@ export default function ReferralRegister() {
   const [refereeEmail, setRefereeEmail]     = useState('');
   const [refereePhone, setRefereePhone]     = useState('');
   const [classification, setClassification] = useState('');
+  const [gender, setGender]                 = useState('');
+  const [dob, setDob]                       = useState('');
+  const [department, setDepartment]         = useState('');
+  const [startDate, setStartDate]           = useState(new Date().toISOString().split('T')[0]);
   const [errors, setErrors]                 = useState<FieldError>({});
   const [touched, setTouched]               = useState<Record<string, boolean>>({});
 
@@ -115,6 +125,10 @@ export default function ReferralRegister() {
   };
 
   // ── Validation ──────────────────────────────────────────────────────────────
+  // Phone: Australian (+61xxxxxxxxx) or UK (+44xxxxxxxxxx) — spaces/dashes allowed
+  const AU_PHONE = /^\+61[2-9]\d{8}$/;
+  const UK_PHONE = /^\+44[1-9]\d{9}$/;
+
   const validate = (): FieldError => {
     const errs: FieldError = {};
     if (!refereeName.trim()) errs.refereeName = 'Full name is required';
@@ -123,12 +137,23 @@ export default function ReferralRegister() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(refereeEmail)) {
       errs.refereeEmail = 'Enter a valid email address';
     }
+    const cleanedPhone = refereePhone.replace(/[\s\-()]/g, '');
     if (!refereePhone.trim()) {
       errs.refereePhone = 'Phone number is required';
-    } else if (!/^\+?\d[\d\s\-]{7,}$/.test(refereePhone)) {
-      errs.refereePhone = 'Enter a valid phone number';
+    } else if (!AU_PHONE.test(cleanedPhone) && !UK_PHONE.test(cleanedPhone)) {
+      errs.refereePhone = 'Use Australian (+61xxxxxxxxx) or UK (+44xxxxxxxxxx) format';
     }
     if (!classification) errs.classification = 'Select a job classification';
+    if (!department) errs.department = 'Select a department';
+    if (!startDate) errs.startDate = 'Employment start date is required';
+    if (!gender) errs.gender = 'Select a gender';
+    if (!dob) {
+      errs.dob = 'Date of birth is required';
+    } else {
+      const born = new Date(dob);
+      const age = (Date.now() - born.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      if (age < 16 || age > 100) errs.dob = 'Enter a valid date of birth';
+    }
     return errs;
   };
 
@@ -142,7 +167,7 @@ export default function ReferralRegister() {
     e.preventDefault();
     const errs = validate();
     setErrors(errs);
-    setTouched({ refereeName: true, refereeEmail: true, refereePhone: true, classification: true });
+    setTouched({ refereeName: true, refereeEmail: true, refereePhone: true, classification: true, department: true, gender: true, dob: true, startDate: true });
     if (Object.keys(errs).length > 0) return;
 
     setSubmitting(true);
@@ -150,8 +175,12 @@ export default function ReferralRegister() {
       const payload: Record<string, any> = {
         refereeName: refereeName.trim(),
         refereeEmail: refereeEmail.trim().toLowerCase(),
-        refereePhone: refereePhone.trim(),
+        refereePhone: refereePhone.replace(/[\s\-()]/g, ''),
         classification,
+        department,
+        gender,
+        dob,
+        startDate,
       };
       if (selectedReferrer) payload.referrerId = selectedReferrer.id;
 
@@ -161,6 +190,7 @@ export default function ReferralRegister() {
       toast.success('Referee registered successfully');
 
       setRefereeName(''); setRefereeEmail(''); setRefereePhone(''); setClassification('');
+      setGender(''); setDob(''); setDepartment(''); setStartDate(new Date().toISOString().split('T')[0]);
       clearReferrer();
       setTouched({}); setErrors({});
     } catch (err: any) {
@@ -240,10 +270,11 @@ export default function ReferralRegister() {
                     id="refereePhone" value={refereePhone}
                     onChange={(e) => setRefereePhone(e.target.value)}
                     onBlur={() => handleBlur('refereePhone')}
-                    placeholder="+234 803 123 4567"
+                    placeholder="+61400000000 or +447700900123"
                     className={`pl-9 ${touched.refereePhone && errors.refereePhone ? 'border-destructive' : ''}`}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">Australian (+61) or UK (+44) international format</p>
                 {touched.refereePhone && errors.refereePhone && <p className="text-xs text-destructive">{errors.refereePhone}</p>}
               </div>
 
@@ -264,6 +295,81 @@ export default function ReferralRegister() {
                   </select>
                 </div>
                 {touched.classification && errors.classification && <p className="text-xs text-destructive">{errors.classification}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="department">Department <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <FaBuilding className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <select
+                    id="department" value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    onBlur={() => handleBlur('department')}
+                    className={`w-full pl-9 pr-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring ${
+                      touched.department && errors.department ? 'border-destructive' : 'border-input'
+                    }`}
+                  >
+                    <option value="">Select department...</option>
+                    <option value="On-Site Security Staff">On-Site Security Staff</option>
+                    <option value="Supervisor & Scheduling">Supervisor &amp; Scheduling</option>
+                    <option value="Administrative Support">Administrative Support</option>
+                  </select>
+                </div>
+                {touched.department && errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
+              </div>
+
+              {/* Employment Start Date */}
+              <div className="space-y-1.5">
+                <Label htmlFor="startDate">Employment Start Date <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <FaCalendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    id="startDate" type="date" value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    onBlur={() => handleBlur('startDate')}
+                    className={`pl-9 ${touched.startDate && errors.startDate ? 'border-destructive' : ''}`}
+                  />
+                </div>
+                {touched.startDate && errors.startDate && <p className="text-xs text-destructive">{errors.startDate}</p>}
+              </div>
+
+              {/* Gender + DOB side by side */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="gender">Gender <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <FaVenusMars className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    <select
+                      id="gender" value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      onBlur={() => handleBlur('gender')}
+                      className={`w-full pl-9 pr-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring ${
+                        touched.gender && errors.gender ? 'border-destructive' : 'border-input'
+                      }`}
+                    >
+                      <option value="">Select...</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  {touched.gender && errors.gender && <p className="text-xs text-destructive">{errors.gender}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="dob">Date of Birth <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <FaCalendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="dob" type="date" value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      onBlur={() => handleBlur('dob')}
+                      max={new Date(Date.now() - 16 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                      className={`pl-9 ${touched.dob && errors.dob ? 'border-destructive' : ''}`}
+                    />
+                  </div>
+                  {touched.dob && errors.dob && <p className="text-xs text-destructive">{errors.dob}</p>}
+                </div>
               </div>
 
             </div>
@@ -425,17 +531,32 @@ export default function ReferralRegister() {
                 <p className="text-muted-foreground">They log in at <span className="font-mono font-medium">/staff/login</span> using this email and password right away.</p>
               </div>
 
-              {/* Connecteam note */}
-              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs flex gap-2">
-                <FaExclamationTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-warning mb-0.5">Connecteam account — manual step required</p>
-                  <p className="text-muted-foreground">
-                    Connecteam does not allow account creation via API yet. You need to manually invite{' '}
-                    <span className="font-medium">{credentials.credentials.email}</span> in your Connecteam dashboard so their shifts sync automatically.
-                  </p>
+              {/* Connecteam status */}
+              {credentials.connecteam?.success ? (
+                <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-xs flex gap-2">
+                  <FaCheckCircle className="w-3.5 h-3.5 text-success shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-success mb-0.5">Connecteam account created</p>
+                    <p className="text-muted-foreground">
+                      Their account is live in Connecteam. Shifts will sync automatically.
+                      {credentials.connecteam.kioskCode && (
+                        <> Kiosk code: <span className="font-mono font-medium">{credentials.connecteam.kioskCode}</span></>
+                      )}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-xs flex gap-2">
+                  <FaPhone className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-warning mb-0.5">Connecteam account — action needed</p>
+                    <p className="text-muted-foreground">
+                      Could not auto-create the Connecteam account ({credentials.connecteam?.message ?? 'unknown error'}).
+                      Please manually invite <span className="font-medium">{credentials.credentials.email}</span> in your Connecteam dashboard.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -675,6 +675,19 @@ export default function Withdrawals() {
                   <p className="text-sm text-muted-foreground">{selectedWithdrawal.note}</p>
                 </div>
               )}
+
+              {/* PDF Receipt Download */}
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => {
+                  const url = `${import.meta.env.VITE_API_URL || 'http://localhost:9000'}/api/withdrawals/${selectedWithdrawal.id}/pdf`;
+                  window.open(url, '_blank');
+                }}
+              >
+                <Download className="w-4 h-4" />
+                Download PDF Receipt
+              </Button>
             </div>
           )}
         </SheetContent>

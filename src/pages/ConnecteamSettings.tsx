@@ -17,6 +17,8 @@ import {
   FaEyeSlash,
   FaInfoCircle,
   FaClock,
+  FaStar,
+  FaUsers,
 } from 'react-icons/fa';
 import { connecteamApi } from '@/services/api';
 import { toast } from 'sonner';
@@ -43,6 +45,8 @@ export default function ConnecteamSettings() {
     weekend: 1.5,
     public_holiday: 2,
   });
+  const [pointsPerHour, setPointsPerHour]               = useState(10);
+  const [referrerBonusPercentage, setReferrerBonusPct]  = useState(50);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,6 +60,8 @@ export default function ConnecteamSettings() {
         setIsConnected(data.isConnected ?? false);
         if (data.shiftMultipliers) setMultipliers({ ...data.shiftMultipliers });
         if (data.lastSync) setLastSync(data.lastSync);
+        if (data.pointsPerHour        != null) setPointsPerHour(data.pointsPerHour);
+        if (data.referrerBonusPercentage != null) setReferrerBonusPct(data.referrerBonusPercentage);
       })
       .catch((err) => {
         toast.error(err.message || 'Failed to load Connecteam settings');
@@ -93,6 +99,8 @@ export default function ConnecteamSettings() {
       syncFrequency,
       autoSync,
       shiftMultipliers: multipliers,
+      pointsPerHour,
+      referrerBonusPercentage,
     })
       .then(() => {
         toast.success('Connecteam settings saved');
@@ -249,6 +257,80 @@ export default function ConnecteamSettings() {
         </div>
 
         {/* Shift Multipliers */}
+        {/* Points Per Hour */}
+        <div className="audit-card">
+          <div className="audit-card-header">
+            <div className="flex items-center gap-2">
+              <FaStar className="w-4 h-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm">Points Per Hour</h3>
+            </div>
+          </div>
+          <div className="audit-card-body space-y-4">
+            <p className="text-xs text-muted-foreground">
+              How many points a staff member earns for each hour worked. Multiplied by the shift multiplier below.
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 space-y-1">
+                <Label>Points per hour worked</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={pointsPerHour}
+                    onChange={(e) => setPointsPerHour(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-28 text-center text-lg font-semibold"
+                  />
+                  <span className="text-sm text-muted-foreground">pts / hour</span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/40 text-center min-w-[120px]">
+                <p className="text-xs text-muted-foreground mb-1">8h regular shift earns</p>
+                <p className="text-lg font-bold">{(8 * pointsPerHour * (multipliers.regular || 1)).toLocaleString()} pts</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Referrer Bonus */}
+        <div className="audit-card">
+          <div className="audit-card-header">
+            <div className="flex items-center gap-2">
+              <FaUsers className="w-4 h-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm">Referrer Bonus</h3>
+            </div>
+          </div>
+          <div className="audit-card-body space-y-4">
+            <p className="text-xs text-muted-foreground">
+              When a referred staff member's hours are approved, the referrer automatically earns this percentage of the employee's points as a bonus.
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 space-y-1">
+                <Label>Referrer bonus (% of employee's points)</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={referrerBonusPercentage}
+                    onChange={(e) => setReferrerBonusPct(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-28 text-center text-lg font-semibold"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/40 text-center min-w-[140px]">
+                <p className="text-xs text-muted-foreground mb-1">Referrer earns per 8h shift</p>
+                <p className="text-lg font-bold">{Math.round(8 * pointsPerHour * (referrerBonusPercentage / 100)).toLocaleString()} pts</p>
+              </div>
+            </div>
+            {referrerBonusPercentage === 0 && (
+              <p className="text-xs text-warning">Referrer bonus is disabled (0%). Set a value above 0 to reward referrers.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Shift Multipliers */}
         <div className="audit-card">
           <div className="audit-card-header">
             <div className="flex items-center gap-2">
@@ -258,7 +340,7 @@ export default function ConnecteamSettings() {
           </div>
           <div className="audit-card-body">
             <p className="text-xs text-muted-foreground mb-4">
-              Points formula: Hours worked × Hourly rate × Profession rate × Shift multiplier
+              Points formula: Hours × {pointsPerHour} pts/hr × Shift multiplier
             </p>
             <div className="space-y-3">
               {Object.entries(multipliers).map(([key, value]) => (
@@ -266,7 +348,7 @@ export default function ConnecteamSettings() {
                   <div>
                     <p className="text-sm font-medium">{multiplierLabels[key] || key}</p>
                     <p className="text-xs text-muted-foreground">
-                      Example: 8h × $35 × 0.5 × {value}x = {Math.round(8 * 35 * 0.5 * value)} pts
+                      Example: 8h × {pointsPerHour} × {value}x = {Math.round(8 * pointsPerHour * value)} pts
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
