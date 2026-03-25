@@ -29,6 +29,7 @@ import AdminNotifications from "./pages/AdminNotifications";
 import ConnecteamSettings from "./pages/ConnecteamSettings";
 import HoursImport from "./pages/HoursImport";
 import ConnecteamLogs from "./pages/ConnecteamLogs";
+import BrevityLogs from "./pages/BrevityLogs";
 import ReferralRegister from "./pages/ReferralRegister";
 import NotFound from "./pages/NotFound";
 
@@ -109,6 +110,7 @@ function AppRoutes() {
         <Route path="settings" element={<Settings />} />
         <Route path="hours-import" element={<HoursImport />} />
         <Route path="connecteam-logs" element={<ConnecteamLogs />} />
+        <Route path="brevity-logs" element={<BrevityLogs />} />
         {/* Super Admin Only Routes */}
         <Route path="connecteam-settings" element={
           <SuperAdminProtectedRoute>

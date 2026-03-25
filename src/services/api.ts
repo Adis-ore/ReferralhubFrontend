@@ -124,6 +124,26 @@ export const connecteamApi = {
   },
 };
 
+// ─── Brevity ──────────────────────────────────────────────────────────────────
+export const brevityApi = {
+  getSettings: () => request<any>('/brevity/settings'),
+  updateSettings: (data: Record<string, any>) =>
+    request<any>('/brevity/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  testConnection: (companyCode: string, apiKey: string) =>
+    request<{ success: boolean; message: string }>('/brevity/test-connection', {
+      method: 'POST',
+      body: JSON.stringify({ companyCode, apiKey }),
+    }),
+  sync: (adminId?: string) =>
+    request<any>('/brevity/sync', { method: 'POST', body: JSON.stringify({ adminId }) }),
+  syncNow: (adminId?: string) =>
+    request<any>('/brevity/sync-now', { method: 'POST', body: JSON.stringify({ adminId }) }),
+  getLogs: (params: Record<string, any> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<{ data: any[]; meta: any }>(`/brevity/logs?${qs}`);
+  },
+};
+
 // ─── Health ──────────────────────────────────────────────────────────────────
 export const healthApi = {
   check: () => request<any>('/health'),

@@ -20,7 +20,7 @@ import {
   FaStar,
   FaUsers,
 } from 'react-icons/fa';
-import { connecteamApi } from '@/services/api';
+import { connecteamApi, brevityApi } from '@/services/api';
 import { toast } from 'sonner';
 
 const multiplierLabels: Record<string, string> = {
@@ -49,6 +49,13 @@ export default function ConnecteamSettings() {
   const [referrerBonusPercentage, setReferrerBonusPct]  = useState(50);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
+  // Brevity state
+  const [brevityCompanyCode, setBrevityCompanyCode] = useState('');
+  const [brevityApiKey, setBrevityApiKey]           = useState('');
+  const [showBrevityKey, setShowBrevityKey]         = useState(false);
+  const [brevityConnected, setBrevityConnected]     = useState(false);
+  const [brevityTesting, setBrevityTesting]         = useState(false);
+
   useEffect(() => {
     connecteamApi.getSettings()
       .then((data) => {
@@ -63,9 +70,15 @@ export default function ConnecteamSettings() {
         if (data.pointsPerHour        != null) setPointsPerHour(data.pointsPerHour);
         if (data.referrerBonusPercentage != null) setReferrerBonusPct(data.referrerBonusPercentage);
       })
-      .catch((err) => {
-        toast.error(err.message || 'Failed to load Connecteam settings');
-      });
+      .catch((err) => toast.error(err.message || 'Failed to load Connecteam settings'));
+
+    brevityApi.getSettings()
+      .then((data) => {
+        setBrevityCompanyCode(data.companyCode ?? '');
+        setBrevityApiKey(data.apiKey ?? '');
+        setBrevityConnected(data.isConnected ?? false);
+      })
+      .catch(() => {});
   }, []);
 
   const handleTestConnection = async () => {
@@ -108,6 +121,35 @@ export default function ConnecteamSettings() {
       .catch((err) => {
         toast.error(err.message || 'Failed to save settings');
       });
+  };
+
+  const handleTestBrevity = async () => {
+    if (!brevityCompanyCode || !brevityApiKey) {
+      toast.error('Company code and API key are required');
+      return;
+    }
+    setBrevityTesting(true);
+    try {
+      const res = await brevityApi.testConnection(brevityCompanyCode, brevityApiKey);
+      if (res.success) {
+        setBrevityConnected(true);
+        toast.success(res.message);
+        await brevityApi.updateSettings({ companyCode: brevityCompanyCode, apiKey: brevityApiKey });
+      } else {
+        setBrevityConnected(false);
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Connection test failed');
+    } finally {
+      setBrevityTesting(false);
+    }
+  };
+
+  const handleSaveBrevity = () => {
+    brevityApi.updateSettings({ companyCode: brevityCompanyCode, apiKey: brevityApiKey })
+      .then(() => toast.success('Brevity settings saved'))
+      .catch((err: any) => toast.error(err.message || 'Failed to save Brevity settings'));
   };
 
   const updateMultiplier = (key: string, value: string) => {
@@ -365,6 +407,67 @@ export default function ConnecteamSettings() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Brevity Integration ───────────────────────────────────── */}
+        <div className="audit-card">
+          <div className="audit-card-header">
+            <div className="flex items-center gap-2">
+              <FaPlug className="w-4 h-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm">Brevity Integration</h3>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${brevityConnected ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                {brevityConnected ? 'Connected' : 'Not Connected'}
+              </span>
+            </div>
+          </div>
+          <div className="audit-card-body space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Connect Brevity to automatically import approved timesheets and award points to staff.
+            </p>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="brevityCompanyCode">Company Code</Label>
+              <Input
+                id="brevityCompanyCode"
+                value={brevityCompanyCode}
+                onChange={(e) => setBrevityCompanyCode(e.target.value)}
+                placeholder="e.g. paramountcare"
+              />
+              <p className="text-xs text-muted-foreground">Found in Brevity → System Setup → Organisation</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="brevityApiKey">Brevity API Key</Label>
+              <div className="relative">
+                <Input
+                  id="brevityApiKey"
+                  type={showBrevityKey ? 'text' : 'password'}
+                  value={brevityApiKey}
+                  onChange={(e) => setBrevityApiKey(e.target.value)}
+                  placeholder="Your Brevity API key"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowBrevityKey(!showBrevityKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showBrevityKey ? <FaEyeSlash className="w-4 h-4" /> : <FaEye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">Found in Brevity → System Setup → API Settings</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleTestBrevity} disabled={brevityTesting} className="gap-2">
+                <FaLink className="w-3.5 h-3.5" />
+                {brevityTesting ? 'Testing...' : 'Test Connection'}
+              </Button>
+              <Button onClick={handleSaveBrevity} className="gap-2">
+                <FaKey className="w-3.5 h-3.5" /> Save Brevity Credentials
+              </Button>
             </div>
           </div>
         </div>

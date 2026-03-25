@@ -20,6 +20,7 @@ import {
   FaPlug,
   FaHourglassHalf,
   FaHistory,
+  FaProjectDiagram,
 } from 'react-icons/fa';
 import { FiSettings as Settings } from 'react-icons/fi';
 import { cn } from '@/lib/utils';
@@ -127,6 +128,12 @@ const navigation: NavItem[] = [
     href: '/connecteam-settings',
     icon: FaPlug,
     roles: ['super_admin'],
+  },
+  {
+    title: 'Brevity Sync Logs',
+    href: '/brevity-logs',
+    icon: FaProjectDiagram,
+    roles: ['super_admin', 'operations_admin'],
   },
   {
     title: 'Configuration',
